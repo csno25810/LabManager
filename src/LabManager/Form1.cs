@@ -92,7 +92,7 @@ namespace MySQL_ConnectionTest
             button4.Text = "MENU";
 
             //Timer1設定
-            timer1.Enabled = true;
+            timer1.Enabled = false; // 接続できたタイミングで有効化する
             timer1.Interval = mySqlSet.ReloadTime * 1000;
 
             timer2.Enabled = true;
@@ -108,6 +108,21 @@ namespace MySQL_ConnectionTest
 
         }
 
+        // 接続状態をタイトルバーとタイマーに反映する
+        private void UpdateConnectionStatus()
+        {
+            if (Connector.IsConnected)
+            {
+                this.Text = "LabManager";
+                timer1.Enabled = true;
+            }
+            else
+            {
+                this.Text = "LabManager  [未接続]";
+                timer1.Enabled = false;
+            }
+        }
+
 
 
         private void GetConnection()
@@ -116,6 +131,7 @@ namespace MySQL_ConnectionTest
             bool conectResult = Connector.Connect(mySqlSet.UserID, mySqlSet.PassWd, mySqlSet.DataBaseName, mySqlSet.ServerIP);
             if (conectResult)
             {
+                UpdateConnectionStatus();
                 return;
             }
 
@@ -124,6 +140,11 @@ namespace MySQL_ConnectionTest
             {
                 configWindow.ShowDialog();
             }
+
+            // 設定が更新された可能性があるので、もう一度だけ接続を試みる。
+            // ここでも失敗した場合は未接続モードのまま続行する（アプリは終了しない）。
+            Connector.Connect(mySqlSet.UserID, mySqlSet.PassWd, mySqlSet.DataBaseName, mySqlSet.ServerIP);
+            UpdateConnectionStatus();
         }
         //データの更新(データ連続取得)
         private void button1_Click(object sender, EventArgs e)
@@ -140,6 +161,9 @@ namespace MySQL_ConnectionTest
         //データ連続取得してdatagridviewに表示
         private void ReadAllStatments()
         {
+            // 未接続のときは DB アクセスをスキップする（自宅PCでの UI 確認用）
+            if (!Connector.IsConnected) return;
+
             timer1.Enabled = false;
             DataTable dataSql = new DataTable();
             DataTable dataSqlCount = new DataTable();

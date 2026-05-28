@@ -11,28 +11,14 @@ namespace MySQL_ConnectionTest
         /// <summary>
         /// アプリケーションのメイン エントリ ポイントです。
         /// </summary>
-        [STAThread]
+        [STAThread]
         static void Main()
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            Setting setting = new Setting();
-            setting.ReadSetting(); // ini 読み込み（あれば）
-
-            bool connected = Connector.Connect(
-                setting.UserID,
-                setting.PassWd,
-                setting.DataBaseName,
-                setting.ServerIP
-            );
-
-            if (!connected)
-            {
-                MessageBox.Show("データベースに接続できません。");
-                return;
-            }
-
+            // DB 接続は Form1 の GetConnection() に一任する。
+            // 接続に失敗してもアプリは起動し、未接続モードとして UI を触れるようにする。
             Application.Run(new Form1());
         }
     }
@@ -123,14 +109,23 @@ namespace MySQL_ConnectionTest
     {
         private static MySqlConnection conn;
 
+        // 現在 DB 接続が確立されているかどうか。
+        // 未接続のときは TableReader / ExecuteCommand がエラーを出さず即 return する。
+        public static bool IsConnected { get; private set; } = false;
+
         public static bool Connect(string user, string password, string dbname, string ip)
         {
+            IsConnected = false;
+
+            try { conn?.Dispose(); } catch { /* 古い接続の破棄失敗は無視 */ }
+
             string connstr = $"Server={ip};Database={dbname};Uid={user};Pwd={password};Charset=utf8;";
             conn = new MySqlConnection(connstr);
 
             try
             {
                 conn.Open();
+                IsConnected = true;
                 return true;
             }
             catch (MySqlException ex)
@@ -142,6 +137,7 @@ namespace MySQL_ConnectionTest
 
         public static bool TableReader(string sql, DataTable table)
         {
+            if (!IsConnected) return false;
             try
             {
                 MySqlDataAdapter da = new MySqlDataAdapter(sql, conn);
@@ -157,6 +153,7 @@ namespace MySQL_ConnectionTest
 
         public static void ExecuteCommand(string sql)
         {
+            if (!IsConnected) return;
             try
             {
                 new MySqlCommand(sql, conn).ExecuteNonQuery();
