@@ -125,6 +125,22 @@ namespace LabManager
             try
             {
                 conn.Open();
+
+                // MySQL 8.0 の既定 sql_mode には ONLY_FULL_GROUP_BY が含まれており、
+                // 旧コードの GROUP BY を伴うクエリが拒否される。
+                // 旧 MySQL の挙動に合わせるため、本接続のセッションでのみ無効化する。
+                try
+                {
+                    using (var modeCmd = new MySqlCommand(
+                        "SET SESSION sql_mode = " +
+                        "(SELECT REPLACE(REPLACE(@@sql_mode, 'ONLY_FULL_GROUP_BY,', ''), 'ONLY_FULL_GROUP_BY', ''))",
+                        conn))
+                    {
+                        modeCmd.ExecuteNonQuery();
+                    }
+                }
+                catch (MySqlException) { /* 設定失敗は致命的ではないので無視 */ }
+
                 IsConnected = true;
                 return true;
             }
