@@ -46,9 +46,10 @@ INSERT INTO touch_log (time_stamp, chip_id) VALUES
     (CONCAT(CURDATE(), ' 11:30:00'), 'CHIP006');
 
 -- 当日の日直
-INSERT INTO duty_schedule (duty_date, student_id, duty_status, duty_type) VALUES
-    (CURDATE(), '7011', 1, '0'),
-    (CURDATE(), '7026', 2, '0')
+INSERT INTO duty_schedule (duty_date, student_id, duty_status, penalty_count, duty_type) VALUES
+    (CURDATE(), '7011', 1, 0, '0'),
+    (CURDATE(), '7026', 2, 2, '0')
 ON DUPLICATE KEY UPDATE
-    duty_status = VALUES(duty_status),
-    duty_type   = VALUES(duty_type);
+    duty_status   = VALUES(duty_status),
+    penalty_count = VALUES(penalty_count),
+    duty_type     = VALUES(duty_type);

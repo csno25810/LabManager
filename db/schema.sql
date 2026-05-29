@@ -40,13 +40,15 @@ CREATE TABLE IF NOT EXISTS touch_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 日直スケジュール
--- duty_status: 0=未出席 / 1=出席 / 2=遅刻
--- duty_type:   '0'=通常日直 / '1'=罰直
+-- duty_status:   0=未出席 / 1=出席 / 2=遅刻
+-- duty_type:     '0'=通常日直 / '1'=罰直
+-- penalty_count: 当該日の罰直カウント (旧コードの Form9 等が duty_schedule から直接参照する)
 CREATE TABLE IF NOT EXISTS duty_schedule (
-    duty_date    DATE         NOT NULL,
-    student_id   VARCHAR(20)  NOT NULL,
-    duty_status  INT          NOT NULL DEFAULT 0,
-    duty_type    VARCHAR(10)  NOT NULL DEFAULT '0',
+    duty_date     DATE         NOT NULL,
+    student_id    VARCHAR(20)  NOT NULL,
+    duty_status   INT          NOT NULL DEFAULT 0,
+    penalty_count INT          NOT NULL DEFAULT 0,
+    duty_type     VARCHAR(10)  NOT NULL DEFAULT '0',
     PRIMARY KEY (duty_date, student_id),
     KEY idx_duty_student (student_id),
     CONSTRAINT fk_duty_student
@@ -59,5 +61,6 @@ CREATE TABLE IF NOT EXISTS duty_schedule (
 CREATE USER IF NOT EXISTS 'labapp'@'localhost'
     IDENTIFIED WITH mysql_native_password BY 'labapp_pw';
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON felica.* TO 'labapp'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, ALTER, CREATE, DROP, REFERENCES, INDEX
+    ON felica.* TO 'labapp'@'localhost';
 FLUSH PRIVILEGES;

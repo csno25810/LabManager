@@ -285,7 +285,7 @@ namespace LabManager
             WHERE 
                 ds.duty_date = '{today}'
             GROUP BY 
-                ds.student_id, pi.name, ds.duty_status, ds.penalty_count
+                ds.student_id, pi.name, ds.duty_status, pi.penalty_count
             ";
 
             // duty_schedule テーブルからのデータ取得
