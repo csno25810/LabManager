@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
@@ -12,7 +12,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using MySql.Data.MySqlClient;
 
-namespace MySQL_ConnectionTest
+namespace LabManager
 {
     public partial class Form8 : Form
     {

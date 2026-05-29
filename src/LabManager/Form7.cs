@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using MySql.Data;
 using MySql.Data.MySqlClient;
 
-namespace MySQL_ConnectionTest
+namespace LabManager
 {
     public partial class Form7 : Form
     {

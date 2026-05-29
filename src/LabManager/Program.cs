@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Windows.Forms;
 using MySql.Data.MySqlClient;
 using System.Data;
 
-namespace MySQL_ConnectionTest
+namespace LabManager
 {
     static class Program
     {

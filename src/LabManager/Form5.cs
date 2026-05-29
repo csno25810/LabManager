@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -14,7 +14,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using static System.Net.WebRequestMethods;
 
-namespace MySQL_ConnectionTest
+namespace LabManager
 {
     public partial class Form5 : Form
     {

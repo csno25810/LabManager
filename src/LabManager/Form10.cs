@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
@@ -9,7 +9,7 @@ using System.Windows.Forms;
 using System.IO;
 using System.Linq;
 
-namespace MySQL_ConnectionTest
+namespace LabManager
 {
     public partial class Form10 : Form
     {

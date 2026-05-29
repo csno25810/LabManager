@@ -1,4 +1,4 @@
-﻿namespace MySQL_ConnectionTest
+namespace LabManager
 {
     partial class Form7
     {

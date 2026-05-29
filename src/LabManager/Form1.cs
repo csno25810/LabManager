@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -10,7 +10,7 @@ using MySql;
 using MySql.Data;
 using MySql.Data.MySqlClient;
 
-namespace MySQL_ConnectionTest
+namespace LabManager
 {
     public partial class Form1 : Form
     {

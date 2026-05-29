@@ -1,7 +1,7 @@
-﻿using MySQL_ConnectionTest;
+using LabManager;
 
 
-namespace MySQL_ConnectionTest
+namespace LabManager
 {
     partial class Form1
     {

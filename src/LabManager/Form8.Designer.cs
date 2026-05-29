@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Windows.Forms;
 
-namespace MySQL_ConnectionTest
+namespace LabManager
 {
     partial class Form8
     {
