@@ -98,12 +98,14 @@ namespace LabManager
 
             string studentId1 = row1.Cells["student_id"].Value.ToString();
             string studentId2 = row2.Cells["student_id"].Value.ToString();
+            DateTime dutyDate1 = Convert.ToDateTime(row1.Cells["duty_date"].Value);
+            DateTime dutyDate2 = Convert.ToDateTime(row2.Cells["duty_date"].Value);
 
             // 確認ダイアログ
             var confirmResult = MessageBox.Show(
-                $"以下の2つのstudent_idを交換します。\n\n" +
-                $"Row1: {studentId1}\n" +
-                $"Row2: {studentId2}\n\n" +
+                "選択した2日の日直担当を入れ替えます。\n\n" +
+                $"{dutyDate1:yyyy-MM-dd}: {studentId1}\n" +
+                $"{dutyDate2:yyyy-MM-dd}: {studentId2}\n\n" +
                 "よろしいですか？",
                 "確認",
                 MessageBoxButtons.YesNo,
@@ -112,30 +114,29 @@ namespace LabManager
 
             if (confirmResult == DialogResult.Yes)
             {
-                // student_idの交換
-                row1.Cells["student_id"].Value = studentId2;
-                row2.Cells["student_id"].Value = studentId1;
-
-                // データベースに反映
-                SwapStudentIdsInDatabase(studentId1, studentId2);
-
-                // 表示更新
-                dataGridView1.Refresh();
+                SwapStudentIdsInDatabase(dutyDate1, studentId1, dutyDate2, studentId2);
+                SetUpDataGridView();
             }
         }
 
-        // データベースでstudent_idを交換する処理
-        private void SwapStudentIdsInDatabase(string studentId1, string studentId2)
+        // 選択した2日分だけ student_id を入れ替える
+        private void SwapStudentIdsInDatabase(DateTime dutyDate1, string studentId1, DateTime dutyDate2, string studentId2)
         {
+            if (studentId1 == studentId2)
+                return;
+
+            string date1 = dutyDate1.ToString("yyyy-MM-dd");
+            string date2 = dutyDate2.ToString("yyyy-MM-dd");
+
             string updateQuery1 = $@"
             UPDATE duty_schedule
             SET student_id = '{studentId2}'
-            WHERE student_id = '{studentId1}'";
+            WHERE duty_date = '{date1}' AND student_id = '{studentId1}'";
 
             string updateQuery2 = $@"
             UPDATE duty_schedule
             SET student_id = '{studentId1}'
-            WHERE student_id = '{studentId2}'";
+            WHERE duty_date = '{date2}' AND student_id = '{studentId2}'";
 
             Connector.ExecuteCommand(updateQuery1);
             Connector.ExecuteCommand(updateQuery2);
