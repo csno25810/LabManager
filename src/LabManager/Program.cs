@@ -105,6 +105,74 @@ namespace LabManager
         }
     }
 
+    /// <summary>
+    /// Google カレンダー連携設定（旧 GoogleCalenderReader.ini 互換）
+    /// </summary>
+    public class CalendarSetting
+    {
+        public string CalendarName = "";
+        public string DefaultQuery = "";
+        public string IcsUrl = "";
+        public int ReloadTime = 100;
+
+        private readonly string _dirPos = "C:\\MyReader\\";
+        private readonly string _fileName = "GoogleCalenderReader.ini";
+
+        public string ConfigPath => _dirPos + _fileName;
+
+        public bool ReadSetting()
+        {
+            if (!Directory.Exists(_dirPos) || !File.Exists(ConfigPath))
+                return false;
+
+            var values = new System.Collections.Generic.Dictionary<string, string>();
+            using (var readFile = new StreamReader(ConfigPath))
+            {
+                string line;
+                while ((line = readFile.ReadLine()) != null)
+                {
+                    if (string.IsNullOrWhiteSpace(line) || !line.Contains("="))
+                        continue;
+
+                    var parts = line.Split(new[] { '=' }, 2);
+                    values[parts[0].Trim()] = parts[1].Trim();
+                }
+            }
+
+            if (values.TryGetValue("CalenderName", out var calendarName))
+                CalendarName = calendarName;
+            if (values.TryGetValue("DefaultQuery", out var defaultQuery))
+                DefaultQuery = defaultQuery;
+            if (values.TryGetValue("IcsUrl", out var icsUrl))
+                IcsUrl = icsUrl;
+            if (values.TryGetValue("ReloadTime", out var reloadTime) && int.TryParse(reloadTime, out var parsed))
+                ReloadTime = parsed;
+
+            return !string.IsNullOrWhiteSpace(GetIcsUrl());
+        }
+
+        /// <summary>
+        /// ICS 取得 URL を返す。IcsUrl があれば優先、なければ CalenderName + DefaultQuery から組み立てる。
+        /// </summary>
+        public string GetIcsUrl()
+        {
+            if (!string.IsNullOrWhiteSpace(IcsUrl))
+                return IcsUrl.Trim();
+
+            if (string.IsNullOrWhiteSpace(CalendarName) || string.IsNullOrWhiteSpace(DefaultQuery))
+                return null;
+
+            var query = DefaultQuery.Trim();
+            if (!query.StartsWith("/"))
+                query = "/" + query;
+            if (!query.EndsWith(".ics", StringComparison.OrdinalIgnoreCase))
+                query = query.TrimEnd('/') + ".ics";
+
+            var encodedName = CalendarName.Replace("@", "%40");
+            return "https://calendar.google.com/calendar/ical/" + encodedName + query;
+        }
+    }
+
     class Connector
     {
         private static MySqlConnection conn;

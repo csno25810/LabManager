@@ -1,59 +1,59 @@
 using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Drawing;
 using System.Globalization;
-using System.Net;
-using System.Text.RegularExpressions;
-using System.Windows.Forms;
-using System.IO;
 using System.Linq;
+using System.Net;
+using System.Text;
+using System.Windows.Forms;
+using Ical.Net.DataTypes;
+using IcalCalendar = Ical.Net.Calendar;
 
 namespace LabManager
 {
     public partial class Form10 : Form
     {
-        private Setting mySqlSet;
+        private readonly CalendarSetting calendarSet = new CalendarSetting();
         private DateTime currentMonth = DateTime.Today;
-
-        // 授業日を DateTime 型で保持
+        private string cachedIcsData;
         private List<DateTime> classDays = new List<DateTime>();
 
         public Form10(Setting settings)
         {
             InitializeComponent();
-            this.mySqlSet = settings;
-
-            // 起動時に当月カレンダーを表示
-            DisplayCalendar(currentMonth);
         }
 
         private void Form10_Load(object sender, EventArgs e)
         {
+            if (!calendarSet.ReadSetting())
+            {
+                MessageBox.Show(
+                    "Google カレンダー設定が見つかりません。\n\n" +
+                    calendarSet.ConfigPath + " を配置してください。\n" +
+                    "（研究室PCの GoogleCalenderReader.ini をコピーすれば動きます）",
+                    "カレンダー設定",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+
             DisplayCalendar(currentMonth);
         }
 
-        /// <summary>
-        /// カレンダーを表示し、Googleカレンダーから授業日を抽出して反映する
-        /// </summary>
         private void DisplayCalendar(DateTime targetMonth)
         {
+            currentMonth = targetMonth;
+            lblMonth.Text = targetMonth.ToString("yyyy年M月", CultureInfo.GetCultureInfo("ja-JP"));
+
             tableLayoutPanel1.Controls.Clear();
             tableLayoutPanel1.RowCount = 6;
             tableLayoutPanel1.ColumnCount = 7;
+
+            classDays = LoadClassDays(targetMonth);
 
             DateTime firstDay = new DateTime(targetMonth.Year, targetMonth.Month, 1);
             int daysInMonth = DateTime.DaysInMonth(targetMonth.Year, targetMonth.Month);
             int dayOfWeek = (int)firstDay.DayOfWeek;
 
-            // Google Calendar (ICS形式) を取得
-            string icsUrl = "https://calendar.google.com/calendar/ical/your_calendar_id/basic.ics";
-            string icsData = new WebClient().DownloadString(icsUrl);
-
-            // 授業日を抽出（DateTime型のListを返す）
-            classDays = ParseIcsForEvents(icsData, targetMonth);
-
-            // カレンダーを構築
             for (int day = 1; day <= daysInMonth; day++)
             {
                 DateTime date = new DateTime(targetMonth.Year, targetMonth.Month, day);
@@ -70,8 +70,7 @@ namespace LabManager
                 };
                 cell.Controls.Add(label);
 
-                // 授業日なら背景を青くする
-                if (classDays.Contains(date))
+                if (classDays.Contains(date.Date))
                 {
                     cell.BackColor = Color.LightBlue;
                     var classLabel = new Label
@@ -87,46 +86,82 @@ namespace LabManager
             }
         }
 
-        /// <summary>
-        /// GoogleカレンダーのICSデータから授業日(DateTime)を抽出する
-        /// </summary>
-        private List<DateTime> ParseIcsForEvents(string icsData, DateTime targetMonth)
+        private List<DateTime> LoadClassDays(DateTime targetMonth)
         {
             var dates = new List<DateTime>();
-            var matches = Regex.Matches(icsData, @"DTSTART;[^:]*:(\d{8})");
+            string icsUrl = calendarSet.GetIcsUrl();
+            if (string.IsNullOrWhiteSpace(icsUrl))
+                return dates;
 
-            foreach (Match match in matches)
+            try
             {
-                string dateStr = match.Groups[1].Value; // 例: 20251015
-                if (DateTime.TryParseExact(dateStr, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date))
+                if (cachedIcsData == null)
+                    cachedIcsData = DownloadIcs(icsUrl);
+
+                dates = ParseIcsForEvents(cachedIcsData, targetMonth);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Google カレンダーの取得に失敗しました。\n" +
+                    "URL・ネットワーク・公開設定を確認してください。\n\n" + ex.Message,
+                    "カレンダー取得エラー",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+
+            return dates;
+        }
+
+        private static string DownloadIcs(string icsUrl)
+        {
+            using (var client = new WebClient { Encoding = Encoding.UTF8 })
+            {
+                return client.DownloadString(icsUrl);
+            }
+        }
+
+        /// <summary>
+        /// ICS から対象月のイベント日付を抽出する（Ical.Net 使用）
+        /// </summary>
+        private static List<DateTime> ParseIcsForEvents(string icsData, DateTime targetMonth)
+        {
+            var dates = new List<DateTime>();
+            if (string.IsNullOrWhiteSpace(icsData))
+                return dates;
+
+            var calendar = IcalCalendar.Load(icsData);
+            var monthStart = new DateTime(targetMonth.Year, targetMonth.Month, 1);
+            var monthEnd = monthStart.AddMonths(1);
+            var searchStart = new CalDateTime(monthStart);
+
+            foreach (var evt in calendar.Events)
+            {
+                foreach (var occurrence in evt.GetOccurrences(searchStart))
                 {
-                    if (date.Year == targetMonth.Year && date.Month == targetMonth.Month)
-                    {
+                    var start = occurrence.Period.StartTime;
+                    if (start == null)
+                        continue;
+
+                    var date = start.Value.Date;
+                    if (date >= monthEnd)
+                        break;
+                    if (date >= monthStart)
                         dates.Add(date);
-                    }
                 }
             }
 
-            // 同一日付の重複除去
             return dates.Distinct().ToList();
         }
 
-        /// <summary>
-        /// 前月へ
-        /// </summary>
         private void buttonPrevMonth_Click(object sender, EventArgs e)
         {
-            currentMonth = currentMonth.AddMonths(-1);
-            DisplayCalendar(currentMonth);
+            DisplayCalendar(currentMonth.AddMonths(-1));
         }
 
-        /// <summary>
-        /// 次月へ
-        /// </summary>
         private void buttonNextMonth_Click(object sender, EventArgs e)
         {
-            currentMonth = currentMonth.AddMonths(1);
-            DisplayCalendar(currentMonth);
+            DisplayCalendar(currentMonth.AddMonths(1));
         }
     }
 }
