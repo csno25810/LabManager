@@ -219,7 +219,9 @@ namespace LabManager
             this.button9.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button9.Size = new System.Drawing.Size(190, 39);
             this.button9.TabIndex = 13;
+            this.button9.Text = "カード管理";
             this.button9.UseVisualStyleBackColor = false;
+            this.button9.Click += new System.EventHandler(this.button9_Click);
             // 
             // button10
             // 
