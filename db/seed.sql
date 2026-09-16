@@ -1,16 +1,17 @@
 -- LabManager: 開発用ダミーデータ
 -- アプリの動作確認に使うため、当日の在席状況・日直状況を含めて投入する
+-- 実行例: mysql --default-character-set=utf8mb4 -u root -p felica < db\seed.sql
 
 USE felica;
 
--- 研究生情報
+-- 研究生情報（UNHEX で名前を投入。Windows mysql リダイレクトの文字化け対策）
 INSERT INTO personal_info (student_id, name, mail, penalty_count) VALUES
-    ('7011',  '田中 太郎', '7011@example.local', 0),
-    ('7041',  '佐藤 花子', '7041@example.local', 1),
-    ('7111',  '鈴木 一郎', '7111@example.local', 0),
-    ('7026',  '高橋 真理', '7026@example.local', 2),
-    ('M9013', '山田 次郎', 'm9013@example.local', 0),
-    ('M9014', '伊藤 美咲', 'm9014@example.local', 0)
+    ('7011',  CONVERT(UNHEX('E794B0E4B8AD20E5A4AAE9838E') USING utf8mb4), '7011@example.local', 0),
+    ('7041',  CONVERT(UNHEX('E4BD90E897A420E88AB1E5AD90') USING utf8mb4), '7041@example.local', 1),
+    ('7111',  CONVERT(UNHEX('E988B4E69CA820E4B880E9838E') USING utf8mb4), '7111@example.local', 0),
+    ('7026',  CONVERT(UNHEX('E9AB98E6A98B20E79C9FE79086') USING utf8mb4), '7026@example.local', 2),
+    ('M9013', CONVERT(UNHEX('E5B1B1E794B020E6ACA1E9838E') USING utf8mb4), 'm9013@example.local', 0),
+    ('M9014', CONVERT(UNHEX('E4BC8AE897A420E7BE8EE592B2') USING utf8mb4), 'm9014@example.local', 0)
 ON DUPLICATE KEY UPDATE
     name          = VALUES(name),
     mail          = VALUES(mail),

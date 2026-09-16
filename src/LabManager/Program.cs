@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -54,7 +55,7 @@ namespace LabManager
         {
             get
             {
-                return $"Server={ServerIP};Database={DataBaseName};Uid={UserID};Pwd={PassWd};Charset=utf8;";
+                return $"Server={ServerIP};Database={DataBaseName};Uid={UserID};Pwd={PassWd};CharSet=utf8mb4;";
             }
         }
 
@@ -206,7 +207,7 @@ namespace LabManager
 
             try { conn?.Dispose(); } catch { /* 古い接続の破棄失敗は無視 */ }
 
-            string connstr = $"Server={ip};Database={dbname};Uid={user};Pwd={password};Charset=utf8;";
+            string connstr = $"Server={ip};Database={dbname};Uid={user};Pwd={password};CharSet=utf8mb4;";
             conn = new MySqlConnection(connstr);
 
             try
@@ -271,6 +272,30 @@ namespace LabManager
     /// <summary>
     /// duty_schedule の手動編集ログ（不正防止用）。
     /// </summary>
+    /// <summary>
+    /// 日本語表示可能な UI フォント。メイリオ未インストール環境でも文字化けしないようフォールバックする。
+    /// </summary>
+    public static class UiFonts
+    {
+        private static readonly string[] PreferredFamilies =
+        {
+            "Yu Gothic UI", "Meiryo UI", "メイリオ", "MS UI Gothic", "MS Gothic", "Segoe UI"
+        };
+
+        public static Font Get(float size, FontStyle style = FontStyle.Regular)
+        {
+            foreach (var familyName in PreferredFamilies)
+            {
+                if (!FontFamily.Families.Any(f => f.Name.Equals(familyName, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                return new Font(familyName, size, style, GraphicsUnit.Point, 128);
+            }
+
+            return new Font(SystemFonts.DefaultFont.FontFamily, size, style);
+        }
+    }
+
     static class DutyAuditLog
     {
         public static void EnsureTable()

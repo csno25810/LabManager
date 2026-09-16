@@ -59,7 +59,7 @@ namespace LabManager
             {
                 Location = new Point(0, 0),
                 Size = new Size(winWidth, SummaryBarHeight),
-                Font = new Font("メイリオ", 14F, FontStyle.Bold),
+                Font = UiFonts.Get(14F, FontStyle.Bold),
                 ForeColor = Color.Black,
                 BackColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle,
@@ -69,7 +69,7 @@ namespace LabManager
 
             lblDutyHeader = new Label
             {
-                Font = new Font("メイリオ", 11F, FontStyle.Bold),
+                Font = UiFonts.Get(11F, FontStyle.Bold),
                 ForeColor = Color.Black,
                 BackColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle,
@@ -78,7 +78,7 @@ namespace LabManager
             };
 
             // LabelTEST
-            maskedTextBox1.Font = new System.Drawing.Font("メイリオ", 24F);
+            maskedTextBox1.Font = UiFonts.Get(24F);
             maskedTextBox1.Location = new Point(1, winHeight - btn1Size - ClockMargin + 1);
             maskedTextBox1.Size = new Size(winWidth, ClockMargin - 1);
             maskedTextBox1.Text = DateTime.Now.ToString("yyyy/MM/dd(ddd) HH:mm");
@@ -97,8 +97,8 @@ namespace LabManager
             dataGridView1.ColumnHeadersVisible = true;
             dataGridView1.ColumnHeadersHeight = ColumnHeadHeight;
             dataGridView1.RowTemplate.Height = (winHeight - btn1Size) / 30;
-            dataGridView1.Font = new System.Drawing.Font("メイリオ", 15F);
-            dataGridView1.ColumnHeadersDefaultCellStyle.Font = new System.Drawing.Font("メイリオ", 10F);
+            dataGridView1.Font = UiFonts.Get(15F);
+            dataGridView1.ColumnHeadersDefaultCellStyle.Font = UiFonts.Get(10F);
 
             dataGridView2.Location = new Point(0, grid2Top);
             dataGridView2.Size = new Size(winWidth, grid2Height);
@@ -106,8 +106,8 @@ namespace LabManager
             dataGridView2.ColumnHeadersVisible = true;
             dataGridView2.ColumnHeadersHeight = ColumnHeadHeight;
             dataGridView2.RowTemplate.Height = (winHeight - btn1Size) / 25;
-            dataGridView2.Font = new System.Drawing.Font("メイリオ", 10F);
-            dataGridView2.ColumnHeadersDefaultCellStyle.Font = new System.Drawing.Font("メイリオ", 10F);
+            dataGridView2.Font = UiFonts.Get(10F);
+            dataGridView2.ColumnHeadersDefaultCellStyle.Font = UiFonts.Get(10F);
 
 
 
@@ -392,8 +392,8 @@ namespace LabManager
             dataGridView2.Columns["duty_status"].Width = 150;
             dataGridView2.Columns["penalty_count"].Width = 100;
 
-            dataGridView2.DefaultCellStyle.Font = new Font("メイリオ", 11F);
-            dataGridView2.ColumnHeadersDefaultCellStyle.Font = new Font("メイリオ", 10F, FontStyle.Bold);
+            dataGridView2.DefaultCellStyle.Font = UiFonts.Get(11F);
+            dataGridView2.ColumnHeadersDefaultCellStyle.Font = UiFonts.Get(10F, FontStyle.Bold);
         }
 
 
@@ -413,7 +413,7 @@ namespace LabManager
                 bool isPresent = dataGridView1[4, i].Value?.ToString() == OnSeat;
                 row.DefaultCellStyle.BackColor = Color.White;
                 row.DefaultCellStyle.ForeColor = Color.Black;
-                row.DefaultCellStyle.Font = new Font("メイリオ", 15F, isPresent ? FontStyle.Bold : FontStyle.Regular);
+                row.DefaultCellStyle.Font = UiFonts.Get(15F, isPresent ? FontStyle.Bold : FontStyle.Regular);
             }
             dataGridView1.Refresh();
         }

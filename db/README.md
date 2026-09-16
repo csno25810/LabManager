@@ -14,14 +14,21 @@ LabManager の開発用 MySQL スキーマ定義とサンプルデータ。
 | `migrate_005_add_chip_list_system_id.sql` | 既存DBの `chip_list` に `system_id` 列を追加 |
 | `migrate_006_add_touch_log_terminal_id.sql` | 既存DBの `touch_log` に `terminal_id` 列を追加 |
 | `migrate_007_add_duty_edit_log.sql` | 出席状況編集ログ `duty_edit_log` テーブルを追加 |
+| `fix_personal_info_names.sql` | 氏名が `????` 化した personal_info を修復 |
 
 ## 適用方法（ローカルMySQLに対して）
 
 PowerShell で以下を順に実行する。`-p` オプションでパスワードが対話入力で求められる。
 
 ```powershell
-mysql -u root -p < db\schema.sql
-mysql -u root -p < db\seed.sql
+mysql -u root -p --default-character-set=utf8mb4 < db\schema.sql
+mysql -u root -p --default-character-set=utf8mb4 < db\seed.sql
+```
+
+氏名が `????` になる場合（Windows で seed 投入時に文字化けしたとき）:
+
+```powershell
+mysql -u root -p --default-character-set=utf8mb4 felica < db\fix_personal_info_names.sql
 ```
 
 既存DBを更新する場合（テーブル追加のみ）:
