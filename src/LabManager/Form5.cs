@@ -181,6 +181,12 @@ namespace LabManager
                 dataGridView2.DataSource = GoogleFormViewTable;
                 dataGridView2.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells;
 
+                if (!string.IsNullOrWhiteSpace(selectedMonth))
+                {
+                    ImportAvailabilityFromGoogleForm(selectedMonth);
+                    RefreshNoteGridView();
+                }
+
                 MessageBox.Show(
                   "GoogleフォームCSVを読み込みました。\n" +
                   $"月度: {(string.IsNullOrWhiteSpace(selectedMonth) ? "未選択（全件）" : selectedMonth)}\n" +
@@ -487,8 +493,28 @@ namespace LabManager
 
         private void InsertDutySchedule(string studentId, DateTime dutyDate)
         {
-            string commandText = $@"INSERT INTO duty_schedule (student_id, duty_date) VALUES ('{studentId}', '{dutyDate:yyyy-MM-dd}')";
+            string commandText = $@"
+                INSERT INTO duty_schedule (duty_date, student_id, duty_status, penalty_count, duty_type)
+                VALUES ('{dutyDate:yyyy-MM-dd}', '{studentId}', 0, 0, '0')";
             Connector.ExecuteCommand(commandText);
+        }
+
+        private bool DutyScheduleExists(string studentId, DateTime dutyDate)
+        {
+            var table = new DataTable();
+            Connector.TableReader(
+                $"SELECT 1 FROM duty_schedule WHERE duty_date = '{dutyDate:yyyy-MM-dd}' AND student_id = '{studentId}' LIMIT 1",
+                table);
+            return table.Rows.Count > 0;
+        }
+
+        private bool TryInsertDutyScheduleIfMissing(string studentId, DateTime dutyDate)
+        {
+            if (DutyScheduleExists(studentId, dutyDate))
+                return false;
+
+            InsertDutySchedule(studentId, dutyDate);
+            return true;
         }
 
         private void InsertDutySchedulePunishment(string studentId, DateTime dutyDate)
@@ -608,10 +634,133 @@ namespace LabManager
             SetupCalendarView();
         }
 
-        // panel2：曜日別登録
-        private void button7_Click(object sender, EventArgs e)
+        private void RefreshNoteGridView()
         {
-            MessageBox.Show("曜日別登録へのGoogleフォーム反映は次段階で統合できます。\n（今は自動割り振り(panel5)側で可否を使う構成です）");
+            var noteTable = new DataTable();
+            noteTable.Columns.Add("学籍番号");
+            noteTable.Columns.Add("備考");
+
+            foreach (var pair in availabilityByStudent.OrderBy(x => x.Key))
+            {
+                if (!string.IsNullOrWhiteSpace(pair.Value.Note))
+                    noteTable.Rows.Add(pair.Key, pair.Value.Note);
+            }
+
+            dataGridViewNote.DataSource = noteTable;
+        }
+
+        private static List<string> ParseStudentIds(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return new List<string>();
+
+            return text
+                .Replace("、", ",")
+                .Split(new[] { ',', '-', ' ', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => Regex.Match(part.Trim(), @"\d+").Value)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct()
+                .ToList();
+        }
+
+        private static bool IsAvailableOnDay(StudentAvailability availability, DayOfWeek dayOfWeek)
+        {
+            switch (dayOfWeek)
+            {
+                case DayOfWeek.Monday: return availability.Mon;
+                case DayOfWeek.Tuesday: return availability.Tue;
+                case DayOfWeek.Wednesday: return availability.Wed;
+                case DayOfWeek.Thursday: return availability.Thu;
+                case DayOfWeek.Friday: return availability.Fri;
+                default: return false;
+            }
+        }
+
+        // panel2：曜日別登録（Googleフォームの登校可否を考慮）
+        private void button7_Click(object sender, EventArgs e)
+        {
+            DateTime startDate = dateTimePicker1.Value.Date;
+            DateTime endDate = dateTimePicker2.Value.Date;
+
+            if (startDate > endDate)
+            {
+                MessageBox.Show("開始日は終了日以前にしてください。", "日直登録");
+                return;
+            }
+
+            var weekdayStudents = new Dictionary<DayOfWeek, List<string>>
+            {
+                { DayOfWeek.Monday, ParseStudentIds(textBoxM.Text) },
+                { DayOfWeek.Tuesday, ParseStudentIds(textBoxT.Text) },
+                { DayOfWeek.Wednesday, ParseStudentIds(textBoxW.Text) },
+                { DayOfWeek.Thursday, ParseStudentIds(textBoxTh.Text) },
+                { DayOfWeek.Friday, ParseStudentIds(textBoxF.Text) },
+            };
+
+            if (weekdayStudents.Values.All(ids => ids.Count == 0))
+            {
+                MessageBox.Show("曜日ごとの学生番号を入力してください。", "日直登録");
+                return;
+            }
+
+            string targetMonth = comboBoxMonth.SelectedItem?.ToString()?.Trim();
+            if (string.IsNullOrWhiteSpace(targetMonth))
+                targetMonth = startDate.Month + "月";
+
+            bool useAvailability = availabilityByStudent.Count > 0 &&
+                                   string.Equals(lastLoadedMonth, targetMonth, StringComparison.Ordinal);
+
+            if (!useAvailability)
+            {
+                var confirm = MessageBox.Show(
+                    "Googleフォームの登校可否が未読込です。\nフォームを読み込んでから登録しますか？",
+                    "日直登録",
+                    MessageBoxButtons.YesNoCancel,
+                    MessageBoxIcon.Question);
+
+                if (confirm == DialogResult.Cancel)
+                    return;
+
+                if (confirm == DialogResult.Yes)
+                {
+                    if (!TryImportAvailabilityFromGoogleForm(targetMonth))
+                        return;
+
+                    RefreshNoteGridView();
+                    useAvailability = availabilityByStudent.Count > 0;
+                }
+            }
+
+            int registered = 0;
+            int skipped = 0;
+
+            for (DateTime date = startDate; date <= endDate; date = date.AddDays(1))
+            {
+                if (!weekdayStudents.TryGetValue(date.DayOfWeek, out List<string> studentIds))
+                    continue;
+
+                foreach (string studentId in studentIds)
+                {
+                    if (useAvailability)
+                    {
+                        if (!availabilityByStudent.TryGetValue(studentId, out StudentAvailability availability) ||
+                            !IsAvailableOnDay(availability, date.DayOfWeek))
+                        {
+                            skipped++;
+                            continue;
+                        }
+                    }
+
+                    if (TryInsertDutyScheduleIfMissing(studentId, date))
+                        registered++;
+                }
+            }
+
+            string message = $"日直を {registered} 件登録しました。";
+            if (skipped > 0)
+                message += $"\nGoogleフォームの登校不可により {skipped} 件スキップしました。";
+
+            MessageBox.Show(message, "日直登録");
         }
 
         // panel5：自動振り分け（Googleフォーム可否を考慮）
