@@ -60,8 +60,9 @@ namespace LabManager
                 Location = new Point(0, 0),
                 Size = new Size(winWidth, SummaryBarHeight),
                 Font = new Font("メイリオ", 14F, FontStyle.Bold),
-                ForeColor = Color.White,
-                BackColor = Color.FromArgb(32, 32, 48),
+                ForeColor = Color.Black,
+                BackColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
                 TextAlign = ContentAlignment.MiddleCenter,
                 Text = "在室 -- 人　|　本日来室 -- 人"
             };
@@ -69,8 +70,9 @@ namespace LabManager
             lblDutyHeader = new Label
             {
                 Font = new Font("メイリオ", 11F, FontStyle.Bold),
-                ForeColor = Color.White,
-                BackColor = Color.FromArgb(48, 48, 64),
+                ForeColor = Color.Black,
+                BackColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Text = "  本日の日直"
             };
@@ -152,9 +154,6 @@ namespace LabManager
         private void UpdateOccupancySummary(int presentCount, int todayCount)
         {
             lblOccupancy.Text = $"在室 {presentCount} 人　|　本日来室 {todayCount} 人";
-            lblOccupancy.BackColor = presentCount > 0
-                ? Color.FromArgb(24, 72, 48)
-                : Color.FromArgb(32, 32, 48);
         }
 
         private void Form1_Shown(object sender, EventArgs e)
@@ -223,9 +222,7 @@ namespace LabManager
             // 未接続のときは DB アクセスをスキップする（自宅PCでの UI 確認用）
             if (!Connector.IsConnected)
             {
-                UpdateOccupancySummary(0, 0);
                 lblOccupancy.Text = "在室 -- 人　|　本日来室 -- 人　（未接続）";
-                lblOccupancy.BackColor = Color.FromArgb(32, 32, 48);
                 return;
             }
 
@@ -365,34 +362,9 @@ namespace LabManager
 
         private void UpdateDutyHeader(DataTable dutyData)
         {
-            if (dutyData.Rows.Count == 0)
-            {
-                lblDutyHeader.Text = "  本日の日直（担当なし）";
-                lblDutyHeader.BackColor = Color.FromArgb(48, 48, 64);
-                return;
-            }
-
-            int alertCount = 0;
-            foreach (DataRow row in dutyData.Rows)
-            {
-                string status = row["duty_status"].ToString();
-                string time = row["attendance_time"].ToString();
-                if (status == "2")
-                    alertCount++;
-                else if (status == "0" && time == "-" && DateTime.Now.TimeOfDay >= DutyDeadline)
-                    alertCount++;
-            }
-
-            if (alertCount > 0)
-            {
-                lblDutyHeader.Text = $"  本日の日直　⚠ {alertCount} 件要確認";
-                lblDutyHeader.BackColor = Color.FromArgb(96, 48, 48);
-            }
-            else
-            {
-                lblDutyHeader.Text = "  本日の日直";
-                lblDutyHeader.BackColor = Color.FromArgb(48, 48, 64);
-            }
+            lblDutyHeader.Text = dutyData.Rows.Count == 0
+                ? "  本日の日直（担当なし）"
+                : $"  本日の日直（{dutyData.Rows.Count}名）";
         }
 
 
@@ -439,19 +411,9 @@ namespace LabManager
             {
                 var row = dataGridView1.Rows[i];
                 bool isPresent = dataGridView1[4, i].Value?.ToString() == OnSeat;
-
-                if (isPresent)
-                {
-                    row.DefaultCellStyle.BackColor = Color.FromArgb(204, 255, 204);
-                    row.DefaultCellStyle.Font = new Font("メイリオ", 15F, FontStyle.Bold);
-                }
-                else
-                {
-                    row.DefaultCellStyle.BackColor = i % 2 == 0
-                        ? Color.FromArgb(255, 241, 241)
-                        : Color.FromArgb(255, 230, 230);
-                    row.DefaultCellStyle.Font = new Font("メイリオ", 15F, FontStyle.Regular);
-                }
+                row.DefaultCellStyle.BackColor = Color.White;
+                row.DefaultCellStyle.ForeColor = Color.Black;
+                row.DefaultCellStyle.Font = new Font("メイリオ", 15F, isPresent ? FontStyle.Bold : FontStyle.Regular);
             }
             dataGridView1.Refresh();
         }
@@ -708,50 +670,25 @@ namespace LabManager
             if (dataGridView2.Columns[e.ColumnIndex].Name != "duty_status" || e.Value == null)
                 return;
 
-            Color cellColor = Color.White;
-            FontStyle fontStyle = FontStyle.Regular;
-
             switch (e.Value.ToString())
             {
                 case "0":
-                    if (!hasTouched && !beforeDeadline)
-                    {
-                        e.Value = "未タッチ";
-                        cellColor = Color.FromArgb(255, 160, 160);
-                        fontStyle = FontStyle.Bold;
-                    }
-                    else if (!hasTouched && beforeDeadline)
+                    if (!hasTouched && beforeDeadline)
                     {
                         var remaining = DutyDeadline - DateTime.Now.TimeOfDay;
                         e.Value = $"待機中（あと{remaining.Minutes}分）";
-                        cellColor = Color.FromArgb(200, 220, 255);
                     }
+                    else if (!hasTouched)
+                        e.Value = "未タッチ";
                     else
-                    {
-                        e.Value = "未確認";
-                        cellColor = Color.FromArgb(255, 220, 220);
-                    }
+                        e.Value = "未出席";
                     break;
                 case "1":
                     e.Value = "出席";
-                    cellColor = Color.FromArgb(180, 240, 180);
-                    fontStyle = FontStyle.Bold;
                     break;
                 case "2":
                     e.Value = "遅刻";
-                    cellColor = Color.FromArgb(255, 200, 80);
-                    fontStyle = FontStyle.Bold;
                     break;
-            }
-
-            for (int i = 0; i < dataGridView2.Columns.Count; i++)
-            {
-                if (!dataGridView2.Columns[i].Visible)
-                    continue;
-
-                var cell = dataGridView2.Rows[e.RowIndex].Cells[i];
-                cell.Style.BackColor = cellColor;
-                cell.Style.Font = new Font("メイリオ", 11F, fontStyle);
             }
         }
 
