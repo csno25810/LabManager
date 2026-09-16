@@ -29,6 +29,7 @@ namespace LabManager
         string OffSeat = "不在";
         string OnSeat = "在席";
         private System.Timers.Timer dailyTimer;
+        private DateTime? lastPenaltyRunDate;
 
         public Form1()
         {
@@ -477,11 +478,12 @@ namespace LabManager
             }
         }
 
+        // 罰直カウントは personal_info.penalty_count を正とする（duty_schedule.penalty_count は使わない）
+        // 通常日直(0): 遅刻10分+1, 1h+2, 3h+3, 未タッチ+4
+        // 罰直(1): 上記に加え、10分以内は -2、未タッチ+4
         private void UpdatePenaltyCount(DataTable results)
         {
-            //日直の始業時間を8:50に設定
             DateTime dutyTime = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 8, 50, 0);
-            string today = DateTime.Now.ToString("yyyy-MM-dd");
 
             foreach (DataRow row in results.Rows)
             {
@@ -490,9 +492,8 @@ namespace LabManager
                 int penaltyCount = int.Parse(row["penalty_count"].ToString());
 
                 int penaltyIncrement = 0;
-                string duty_type = row["duty_type"].ToString();
-                // actualTime が null ではない場合のみ遅延を計算
-                if (duty_type == "0")
+                bool isPenaltyDuty = row["duty_type"].ToString() == "1";
+                if (!isPenaltyDuty)
                 {
                     if (actualTime != null)
                     {
@@ -517,7 +518,7 @@ namespace LabManager
                         penaltyIncrement = 4;
                     }
                 }
-                if (duty_type == "1")//罰直として登録した場合
+                else
                 {
                     if (actualTime != null)
                     {
@@ -548,7 +549,7 @@ namespace LabManager
                 }
 
 
-                UpdatePenalty(studentId, today, penaltyCount + penaltyIncrement);
+                UpdatePenalty(studentId, penaltyCount + penaltyIncrement);
             }
         }
 
@@ -563,7 +564,7 @@ namespace LabManager
             Connector.ExecuteCommand(updateQuery);
         }
 
-        private void UpdatePenalty(string studentId, string date, int newPenaltyCount)
+        private void UpdatePenalty(string studentId, int newPenaltyCount)
         {
             string updateQuery = $@"
         UPDATE personal_info
@@ -575,9 +576,11 @@ namespace LabManager
 
         private void timer3_Tick(object sender, EventArgs e)
         {
-            // 毎日18時00分に実行するタスク
-            if (DateTime.Now.Hour == 16 && DateTime.Now.Minute == 0 && DateTime.Now.Second == 0)
+            // 毎日 18:00 に1回だけ罰直カウントを更新
+            DateTime now = DateTime.Now;
+            if (now.Hour == 18 && now.Minute == 0 && lastPenaltyRunDate != now.Date)
             {
+                lastPenaltyRunDate = now.Date;
                 PerformDailyTask();
             }
         }

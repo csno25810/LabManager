@@ -43,7 +43,11 @@ namespace LabManager
         /// </summary>
         private void LoadDutySchedule()
         {
-            string query = "SELECT duty_date, student_id, duty_status, penalty_count, duty_type FROM duty_schedule ORDER BY duty_date";
+            string query = @"
+                SELECT ds.duty_date, ds.student_id, ds.duty_status, pi.penalty_count, ds.duty_type
+                FROM duty_schedule ds
+                INNER JOIN personal_info pi ON ds.student_id = pi.student_id
+                ORDER BY ds.duty_date";
             dutyTable.Clear();
             Connector.TableReader(query, dutyTable);
             dataGridViewDuty.DataSource = dutyTable;
@@ -52,7 +56,7 @@ namespace LabManager
             dataGridViewDuty.Columns["duty_date"].HeaderText = "日付";
             dataGridViewDuty.Columns["student_id"].HeaderText = "学籍番号";
             dataGridViewDuty.Columns["duty_status"].HeaderText = "ステータス";
-            dataGridViewDuty.Columns["penalty_count"].HeaderText = "罰直回数";
+            dataGridViewDuty.Columns["penalty_count"].HeaderText = "罰直回数(累計)";
             dataGridViewDuty.Columns["duty_type"].HeaderText = "種類";
         }
 
