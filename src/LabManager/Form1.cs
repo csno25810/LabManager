@@ -22,6 +22,12 @@ namespace LabManager
         int btn1Size = 30;
         int ColumnHeadHeight = 40;
         int ClockMargin = 50;
+        int SummaryBarHeight = 40;
+        int DutyHeaderHeight = 28;
+        static readonly TimeSpan DutyDeadline = new TimeSpan(8, 50, 0);
+
+        private Label lblOccupancy;
+        private Label lblDutyHeader;
 
         // 設定ファイルをリードする
         public Setting mySqlSet = new Setting();
@@ -48,16 +54,43 @@ namespace LabManager
             //this.Location = new Point(winWidth, 0);
             this.Location = new Point(winWidth, 0);
 
+            // 在室人数サマリー
+            lblOccupancy = new Label
+            {
+                Location = new Point(0, 0),
+                Size = new Size(winWidth, SummaryBarHeight),
+                Font = new Font("メイリオ", 14F, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(32, 32, 48),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Text = "在室 -- 人　|　本日来室 -- 人"
+            };
+
+            lblDutyHeader = new Label
+            {
+                Font = new Font("メイリオ", 11F, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(48, 48, 64),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Text = "  本日の日直"
+            };
+
             // LabelTEST
             maskedTextBox1.Font = new System.Drawing.Font("メイリオ", 24F);
             maskedTextBox1.Location = new Point(1, winHeight - btn1Size - ClockMargin + 1);
             maskedTextBox1.Size = new Size(winWidth, ClockMargin - 1);
             maskedTextBox1.Text = DateTime.Now.ToString("yyyy/MM/dd(ddd) HH:mm");
 
+            int grid1Height = winHeight * 2 / 3 - SummaryBarHeight - DutyHeaderHeight;
+            int grid2Top = winHeight * 2 / 3;
+            int grid2Height = winHeight * 1 / 3 - btn1Size - ClockMargin;
+
+            lblDutyHeader.Location = new Point(0, SummaryBarHeight + grid1Height);
+            lblDutyHeader.Size = new Size(winWidth, DutyHeaderHeight);
 
             // データ表示部分の初期設定
-            dataGridView1.Location = new Point(0, 0);
-            dataGridView1.Size = new Size(winWidth, winHeight * 2 / 3);
+            dataGridView1.Location = new Point(0, SummaryBarHeight);
+            dataGridView1.Size = new Size(winWidth, grid1Height);
             dataGridView1.RowHeadersVisible = false;
             dataGridView1.ColumnHeadersVisible = true;
             dataGridView1.ColumnHeadersHeight = ColumnHeadHeight;
@@ -65,8 +98,8 @@ namespace LabManager
             dataGridView1.Font = new System.Drawing.Font("メイリオ", 15F);
             dataGridView1.ColumnHeadersDefaultCellStyle.Font = new System.Drawing.Font("メイリオ", 10F);
 
-            dataGridView2.Location = new Point(0, winHeight * 2 / 3);
-            dataGridView2.Size = new Size(winWidth, winHeight * 1 / 3 - btn1Size - ClockMargin);
+            dataGridView2.Location = new Point(0, grid2Top);
+            dataGridView2.Size = new Size(winWidth, grid2Height);
             dataGridView2.RowHeadersVisible = false;
             dataGridView2.ColumnHeadersVisible = true;
             dataGridView2.ColumnHeadersHeight = ColumnHeadHeight;
@@ -108,7 +141,20 @@ namespace LabManager
 
             ReadAllStatments();
 
+            Controls.Add(lblOccupancy);
+            Controls.Add(lblDutyHeader);
+            lblOccupancy.BringToFront();
+            lblDutyHeader.BringToFront();
+
             Shown += Form1_Shown;
+        }
+
+        private void UpdateOccupancySummary(int presentCount, int todayCount)
+        {
+            lblOccupancy.Text = $"在室 {presentCount} 人　|　本日来室 {todayCount} 人";
+            lblOccupancy.BackColor = presentCount > 0
+                ? Color.FromArgb(24, 72, 48)
+                : Color.FromArgb(32, 32, 48);
         }
 
         private void Form1_Shown(object sender, EventArgs e)
@@ -175,7 +221,13 @@ namespace LabManager
         private void ReadAllStatments()
         {
             // 未接続のときは DB アクセスをスキップする（自宅PCでの UI 確認用）
-            if (!Connector.IsConnected) return;
+            if (!Connector.IsConnected)
+            {
+                UpdateOccupancySummary(0, 0);
+                lblOccupancy.Text = "在室 -- 人　|　本日来室 -- 人　（未接続）";
+                lblOccupancy.BackColor = Color.FromArgb(32, 32, 48);
+                return;
+            }
 
             timer1.Enabled = false;
             DataTable dataSql = new DataTable();
@@ -191,6 +243,7 @@ namespace LabManager
             if (dataSql.Rows.Count == 0)
             {
                 dataGridView1.DataSource = null;
+                UpdateOccupancySummary(0, 0);
                 goto LoadDutySchedule;
             }
 
@@ -206,18 +259,20 @@ namespace LabManager
             dataSql.Columns[2].ColumnName = "BBB";
 
             // 描画領域の設定
+            int attendanceAreaHeight = winHeight - btn1Size - ColumnHeadHeight - ClockMargin - SummaryBarHeight - DutyHeaderHeight;
             if (dataSql.Rows.Count < 15)
             {
-                dataGridView1.RowTemplate.Height = (winHeight - btn1Size - ColumnHeadHeight - ClockMargin) / 15;
+                dataGridView1.RowTemplate.Height = attendanceAreaHeight / 15;
             }
             else
             {
-                dataGridView1.RowTemplate.Height = (winHeight - btn1Size - ColumnHeadHeight - ClockMargin) / dataSql.Rows.Count;
+                dataGridView1.RowTemplate.Height = attendanceAreaHeight / dataSql.Rows.Count;
             }
 
             DataTable newView = dataSql;
             newView.Columns.Add("State", typeof(string));
 
+            int presentCount = 0;
             for (int i = 0; i < dataSql.Rows.Count; i++)
             {
                 if (int.Parse(dataSql.Rows[i]["COUNT(name)"].ToString()) % 2 == 0)
@@ -227,9 +282,11 @@ namespace LabManager
                 else
                 {
                     newView.Rows[i]["State"] = OnSeat;
+                    presentCount++;
                 }
             }
             newView.Columns.Remove("COUNT(name)");
+            UpdateOccupancySummary(presentCount, dataSql.Rows.Count);
 
             // 内容をバインドし表示する。
             dataGridView1.DataSource = newView;
@@ -252,8 +309,8 @@ namespace LabManager
             dataGridView1.Columns[3].Width = 150;
             dataGridView1.Columns[4].Width = 100;
 
-            dataGridView1.Rows[dataGridView1.CurrentCell.RowIndex].Selected = false;
-
+            if (dataGridView1.CurrentCell != null)
+                dataGridView1.Rows[dataGridView1.CurrentCell.RowIndex].Selected = false;
 
             //DataGridView1にバインドされているDataTableを取得
             DataTable sorttable = (DataTable)dataGridView1.DataSource;
@@ -262,7 +319,8 @@ namespace LabManager
             dataGridView1.Columns[3].HeaderCell.SortGlyphDirection = SortOrder.Descending;
             dataGridView1.Columns[4].HeaderCell.SortGlyphDirection = SortOrder.Descending;
 
-            dataGridView1.Rows[dataGridView1.CurrentCell.RowIndex].Selected = false;
+            if (dataGridView1.CurrentCell != null)
+                dataGridView1.Rows[dataGridView1.CurrentCell.RowIndex].Selected = false;
 
             // 色換え
             CellColorChange();
@@ -276,8 +334,9 @@ namespace LabManager
             SELECT 
                 ds.student_id, 
                 pi.name, 
-                COALESCE(MIN(DATE_FORMAT(tl.time_stamp, '%H:%i')), '-') AS '出席時刻',
-                ds.duty_status, 
+                COALESCE(MIN(DATE_FORMAT(tl.time_stamp, '%H:%i')), '-') AS 'attendance_time',
+                ds.duty_status,
+                ds.duty_type,
                 pi.penalty_count
             FROM 
                 duty_schedule ds
@@ -290,7 +349,7 @@ namespace LabManager
             WHERE 
                 ds.duty_date = '{today}'
             GROUP BY 
-                ds.student_id, pi.name, ds.duty_status, pi.penalty_count
+                ds.student_id, pi.name, ds.duty_status, ds.duty_type, pi.penalty_count
             ";
 
             // duty_schedule テーブルからのデータ取得
@@ -300,8 +359,40 @@ namespace LabManager
             Connector.TableReader(query, dataDutySchedule);
 
             SetupDataGridView2(dataDutySchedule);
-            //CheckLateArrivalsAndUpdate();//日直判定のやつ
+            UpdateDutyHeader(dataDutySchedule);
             timer1.Enabled = true;
+        }
+
+        private void UpdateDutyHeader(DataTable dutyData)
+        {
+            if (dutyData.Rows.Count == 0)
+            {
+                lblDutyHeader.Text = "  本日の日直（担当なし）";
+                lblDutyHeader.BackColor = Color.FromArgb(48, 48, 64);
+                return;
+            }
+
+            int alertCount = 0;
+            foreach (DataRow row in dutyData.Rows)
+            {
+                string status = row["duty_status"].ToString();
+                string time = row["attendance_time"].ToString();
+                if (status == "2")
+                    alertCount++;
+                else if (status == "0" && time == "-" && DateTime.Now.TimeOfDay >= DutyDeadline)
+                    alertCount++;
+            }
+
+            if (alertCount > 0)
+            {
+                lblDutyHeader.Text = $"  本日の日直　⚠ {alertCount} 件要確認";
+                lblDutyHeader.BackColor = Color.FromArgb(96, 48, 48);
+            }
+            else
+            {
+                lblDutyHeader.Text = "  本日の日直";
+                lblDutyHeader.BackColor = Color.FromArgb(48, 48, 64);
+            }
         }
 
 
@@ -310,22 +401,27 @@ namespace LabManager
         private void SetupDataGridView2(DataTable data)
         {
             dataGridView2.DataSource = data;
-            dataGridView2.AutoGenerateColumns = true;  // Ensure this is set to manipulate columns manually
+            dataGridView2.AutoGenerateColumns = true;
 
+            if (dataGridView2.Columns.Count < 6)
+                return;
 
-            // Set column headers text, assuming there are enough columns
+            dataGridView2.Columns["duty_type"].Visible = false;
+
             dataGridView2.Columns[0].HeaderText = "学籍番号";
             dataGridView2.Columns[1].HeaderText = "日直氏名";
-            dataGridView2.Columns[2].HeaderText = "出席時刻";
-            dataGridView2.Columns[3].HeaderText = "出席状況";
-            dataGridView2.Columns[4].HeaderText = "罰直回数";
+            dataGridView2.Columns["attendance_time"].HeaderText = "出席時刻";
+            dataGridView2.Columns["duty_status"].HeaderText = "出席状況";
+            dataGridView2.Columns["penalty_count"].HeaderText = "罰直回数";
 
-            // Set column widths or other properties as needed
             dataGridView2.Columns[0].Width = 130;
             dataGridView2.Columns[1].Width = winWidth - (130 + 150 + 150 + 100);
-            dataGridView2.Columns[2].Width = 150;
-            dataGridView2.Columns[3].Width = 150;
-            dataGridView2.Columns[4].Width = 100;
+            dataGridView2.Columns["attendance_time"].Width = 150;
+            dataGridView2.Columns["duty_status"].Width = 150;
+            dataGridView2.Columns["penalty_count"].Width = 100;
+
+            dataGridView2.DefaultCellStyle.Font = new Font("メイリオ", 11F);
+            dataGridView2.ColumnHeadersDefaultCellStyle.Font = new Font("メイリオ", 10F, FontStyle.Bold);
         }
 
 
@@ -333,36 +429,29 @@ namespace LabManager
 
         private void CellColorChange()
         {
-            dataGridView1.Rows[dataGridView1.CurrentCell.RowIndex].Selected = false;
-            // 色換え
+            if (dataGridView1.RowCount == 0)
+                return;
+
+            if (dataGridView1.CurrentCell != null)
+                dataGridView1.Rows[dataGridView1.CurrentCell.RowIndex].Selected = false;
+
             for (int i = 0; i < dataGridView1.RowCount; i++)
             {
-                if (dataGridView1[4, i].Value.ToString() == OffSeat)
+                var row = dataGridView1.Rows[i];
+                bool isPresent = dataGridView1[4, i].Value?.ToString() == OnSeat;
+
+                if (isPresent)
                 {
-                    if (i % 2 == 0)
-                    {
-                        dataGridView1.Rows[i].DefaultCellStyle.BackColor = Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(241)))), ((int)(((byte)(241)))));
-                    }
-                    else
-                    {
-                        dataGridView1.Rows[i].DefaultCellStyle.BackColor = Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(230)))), ((int)(((byte)(230)))));
-                    }
+                    row.DefaultCellStyle.BackColor = Color.FromArgb(204, 255, 204);
+                    row.DefaultCellStyle.Font = new Font("メイリオ", 15F, FontStyle.Bold);
                 }
-
-
-                if (dataGridView1[4, i].Value.ToString() == OnSeat)
+                else
                 {
-                    if (i % 2 == 0)
-                    {
-                        dataGridView1.Rows[i].DefaultCellStyle.BackColor = Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(255)))), ((int)(((byte)(241)))));
-                    }
-                    else
-                    {
-                        dataGridView1.Rows[i].DefaultCellStyle.BackColor = Color.FromArgb(((int)(((byte)(230)))), ((int)(((byte)(255)))), ((int)(((byte)(230)))));
-                    }
+                    row.DefaultCellStyle.BackColor = i % 2 == 0
+                        ? Color.FromArgb(255, 241, 241)
+                        : Color.FromArgb(255, 230, 230);
+                    row.DefaultCellStyle.Font = new Font("メイリオ", 15F, FontStyle.Regular);
                 }
-
-
             }
             dataGridView1.Refresh();
         }
@@ -414,6 +503,10 @@ namespace LabManager
         {
             maskedTextBox1.Text = DateTime.Now.ToString("yyyy/MM/dd(ddd) HH:mm");
             maskedTextBox1.Refresh();
+
+            // 8:50 前の「待機中（あとX分）」表示を更新
+            if (DateTime.Now.TimeOfDay < DutyDeadline && dataGridView2.RowCount > 0)
+                dataGridView2.Refresh();
         }
 
 
@@ -596,31 +689,69 @@ namespace LabManager
         //日直表示部分の表示設定
         private void dataGridView2_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
-            if (dataGridView2.Columns[e.ColumnIndex].Name == "duty_status" && e.Value != null)
-            {
-                // duty_statusの値に基づくテキストの変更と色の設定
-                Color cellColor = Color.White; // デフォルト色
-                switch (e.Value.ToString())
-                {
-                    case "0":
-                        e.Value = "未出席";
-                        cellColor = Color.FromArgb(255, 204, 204);  // 淡いピンクより少し濃い色
-                        break;
-                    case "1":
-                        e.Value = "出席";
-                        cellColor = Color.FromArgb(204, 255, 204);  // 淡いグリーン
-                        break;
-                    case "2":
-                        e.Value = "遅刻";
-                        cellColor = Color.FromArgb(255, 255, 204);  // 淡いイエロー
-                        break;
-                }
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                return;
 
-                // 行全体に色を適用
-                for (int i = 0; i < dataGridView2.Columns.Count; i++)
-                {
-                    dataGridView2.Rows[e.RowIndex].Cells[i].Style.BackColor = cellColor;
-                }
+            var row = dataGridView2.Rows[e.RowIndex];
+            string attendanceTime = row.Cells["attendance_time"]?.Value?.ToString() ?? "-";
+            bool hasTouched = attendanceTime != "-";
+            bool beforeDeadline = DateTime.Now.TimeOfDay < DutyDeadline;
+            bool isPenaltyDuty = row.Cells["duty_type"]?.Value?.ToString() == "1";
+
+            if (dataGridView2.Columns[e.ColumnIndex].Name == "name" && e.Value != null)
+            {
+                string name = e.Value.ToString();
+                if (isPenaltyDuty && !name.Contains("罰直"))
+                    e.Value = name + "（罰直）";
+            }
+
+            if (dataGridView2.Columns[e.ColumnIndex].Name != "duty_status" || e.Value == null)
+                return;
+
+            Color cellColor = Color.White;
+            FontStyle fontStyle = FontStyle.Regular;
+
+            switch (e.Value.ToString())
+            {
+                case "0":
+                    if (!hasTouched && !beforeDeadline)
+                    {
+                        e.Value = "未タッチ";
+                        cellColor = Color.FromArgb(255, 160, 160);
+                        fontStyle = FontStyle.Bold;
+                    }
+                    else if (!hasTouched && beforeDeadline)
+                    {
+                        var remaining = DutyDeadline - DateTime.Now.TimeOfDay;
+                        e.Value = $"待機中（あと{remaining.Minutes}分）";
+                        cellColor = Color.FromArgb(200, 220, 255);
+                    }
+                    else
+                    {
+                        e.Value = "未確認";
+                        cellColor = Color.FromArgb(255, 220, 220);
+                    }
+                    break;
+                case "1":
+                    e.Value = "出席";
+                    cellColor = Color.FromArgb(180, 240, 180);
+                    fontStyle = FontStyle.Bold;
+                    break;
+                case "2":
+                    e.Value = "遅刻";
+                    cellColor = Color.FromArgb(255, 200, 80);
+                    fontStyle = FontStyle.Bold;
+                    break;
+            }
+
+            for (int i = 0; i < dataGridView2.Columns.Count; i++)
+            {
+                if (!dataGridView2.Columns[i].Visible)
+                    continue;
+
+                var cell = dataGridView2.Rows[e.RowIndex].Cells[i];
+                cell.Style.BackColor = cellColor;
+                cell.Style.Font = new Font("メイリオ", 11F, fontStyle);
             }
         }
 
