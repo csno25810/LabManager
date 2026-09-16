@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS personal_info (
 CREATE TABLE IF NOT EXISTS chip_list (
     chip_id    VARCHAR(50) NOT NULL,
     student_id VARCHAR(20) NOT NULL,
+    system_id  VARCHAR(10) NOT NULL,
     PRIMARY KEY (chip_id),
     KEY idx_chip_list_student (student_id),
     CONSTRAINT fk_chip_list_student

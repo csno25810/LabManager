@@ -17,14 +17,16 @@ ON DUPLICATE KEY UPDATE
     penalty_count = VALUES(penalty_count);
 
 -- NFCチップ対応
-INSERT INTO chip_list (chip_id, student_id) VALUES
-    ('CHIP001', '7011'),
-    ('CHIP002', '7041'),
-    ('CHIP003', '7111'),
-    ('CHIP004', '7026'),
-    ('CHIP005', 'M9013'),
-    ('CHIP006', 'M9014')
-ON DUPLICATE KEY UPDATE student_id = VALUES(student_id);
+INSERT INTO chip_list (chip_id, student_id, system_id) VALUES
+    ('CHIP001', '7011',  'S000007011'),
+    ('CHIP002', '7041',  'S000007041'),
+    ('CHIP003', '7111',  'S000007111'),
+    ('CHIP004', '7026',  'S000007026'),
+    ('CHIP005', 'M9013', 'S0000M9013'),
+    ('CHIP006', 'M9014', 'S0000M9014')
+ON DUPLICATE KEY UPDATE
+    student_id = VALUES(student_id),
+    system_id  = VALUES(system_id);
 
 -- 当日のタッチ履歴（既存があれば残す形で追加）
 -- 田中: 入(09:05) → 退(12:00) → 入(13:00) ⇒ 在席
