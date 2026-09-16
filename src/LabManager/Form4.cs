@@ -80,6 +80,12 @@ namespace LabManager
             form10.ShowDialog();
         }
 
+        private void button8_Click(object sender, EventArgs e)
+        {
+            Form11 form11 = new Form11(mySqlSet);
+            form11.ShowDialog();
+        }
+
 
 
         private void label1_Click(object sender, EventArgs e)

@@ -204,7 +204,9 @@ namespace LabManager
             this.button8.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button8.Size = new System.Drawing.Size(190, 39);
             this.button8.TabIndex = 12;
+            this.button8.Text = "学生情報管理";
             this.button8.UseVisualStyleBackColor = false;
+            this.button8.Click += new System.EventHandler(this.button8_Click);
             // 
             // button9
             // 
