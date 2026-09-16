@@ -158,12 +158,20 @@ namespace LabManager
 
         private void Form1_Shown(object sender, EventArgs e)
         {
-            if (!Program.TvMode || tvLeftPanel != null)
+            if (tvLeftPanel != null)
                 return;
 
             tvLeftPanel = new Form14(mySqlSet);
             tvLeftPanel.ConfigureForTvDisplay();
-            tvLeftPanel.Show(this);
+            // 左半分は独立ウィンドウとして表示（Owner を付けると位置がずれることがある）
+            tvLeftPanel.Show();
+            FormClosed += Form1_FormClosed;
+        }
+
+        private void Form1_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            if (tvLeftPanel != null && !tvLeftPanel.IsDisposed)
+                tvLeftPanel.Close();
         }
 
         // 接続状態をタイトルバーとタイマーに反映する
