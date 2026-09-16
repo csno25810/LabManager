@@ -176,11 +176,10 @@ namespace LabManager
 
 
 
-            // データが存在しない場合は警告して終了
             if (dataSql.Rows.Count == 0)
             {
-                MessageBox.Show("データが見つかりませんでした。");
-                return;
+                dataGridView1.DataSource = null;
+                goto LoadDutySchedule;
             }
 
 
@@ -223,11 +222,6 @@ namespace LabManager
             // 内容をバインドし表示する。
             dataGridView1.DataSource = newView;
 
-            if (dataGridView1.RowCount <= 0)
-            {
-                return;
-            }
-
             dataGridView1.Columns[0].HeaderText = "学籍番号";
             dataGridView1.Columns[1].HeaderText = "氏名";
             dataGridView1.Columns[2].HeaderText = "初回タッチ時刻";
@@ -261,12 +255,10 @@ namespace LabManager
             // 色換え
             CellColorChange();
 
+            LoadDutySchedule:
+
             DataTable fetchedData = FetchData();
             CheckAndUpdateDutyStatus(fetchedData);
-
-
-
-
 
             string query = $@"
             SELECT 
