@@ -35,18 +35,18 @@ ON DUPLICATE KEY UPDATE
 -- 高橋: 入(11:00)                          ⇒ 在席（遅刻）
 -- 山田: 入(13:30)                          ⇒ 在席
 -- 伊藤: 入(09:00) → 退(11:30)              ⇒ 不在
-INSERT INTO touch_log (time_stamp, chip_id) VALUES
-    (CONCAT(CURDATE(), ' 09:05:00'), 'CHIP001'),
-    (CONCAT(CURDATE(), ' 09:12:00'), 'CHIP002'),
-    (CONCAT(CURDATE(), ' 09:30:00'), 'CHIP003'),
-    (CONCAT(CURDATE(), ' 10:15:00'), 'CHIP002'),
-    (CONCAT(CURDATE(), ' 10:45:00'), 'CHIP002'),
-    (CONCAT(CURDATE(), ' 11:00:00'), 'CHIP004'),
-    (CONCAT(CURDATE(), ' 12:00:00'), 'CHIP001'),
-    (CONCAT(CURDATE(), ' 13:00:00'), 'CHIP001'),
-    (CONCAT(CURDATE(), ' 13:30:00'), 'CHIP005'),
-    (CONCAT(CURDATE(), ' 09:00:00'), 'CHIP006'),
-    (CONCAT(CURDATE(), ' 11:30:00'), 'CHIP006');
+INSERT INTO touch_log (time_stamp, terminal_id, chip_id) VALUES
+    (CONCAT(CURDATE(), ' 09:05:00'), '001', 'CHIP001'),
+    (CONCAT(CURDATE(), ' 09:12:00'), '001', 'CHIP002'),
+    (CONCAT(CURDATE(), ' 09:30:00'), '001', 'CHIP003'),
+    (CONCAT(CURDATE(), ' 10:15:00'), '001', 'CHIP002'),
+    (CONCAT(CURDATE(), ' 10:45:00'), '001', 'CHIP002'),
+    (CONCAT(CURDATE(), ' 11:00:00'), '001', 'CHIP004'),
+    (CONCAT(CURDATE(), ' 12:00:00'), '001', 'CHIP001'),
+    (CONCAT(CURDATE(), ' 13:00:00'), '001', 'CHIP001'),
+    (CONCAT(CURDATE(), ' 13:30:00'), '001', 'CHIP005'),
+    (CONCAT(CURDATE(), ' 09:00:00'), '001', 'CHIP006'),
+    (CONCAT(CURDATE(), ' 11:30:00'), '001', 'CHIP006');
 
 -- 当日の日直
 INSERT INTO duty_schedule (duty_date, student_id, duty_status, penalty_count, duty_type) VALUES

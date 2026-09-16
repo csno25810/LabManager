@@ -30,9 +30,10 @@ CREATE TABLE IF NOT EXISTS chip_list (
 
 -- タッチ履歴
 CREATE TABLE IF NOT EXISTS touch_log (
-    id         INT          NOT NULL AUTO_INCREMENT,
-    time_stamp DATETIME     NOT NULL,
-    chip_id    VARCHAR(50)  NOT NULL,
+    id          INT          NOT NULL AUTO_INCREMENT,
+    time_stamp  DATETIME     NOT NULL,
+    terminal_id VARCHAR(10)  NOT NULL,
+    chip_id     VARCHAR(50)  NOT NULL,
     PRIMARY KEY (id),
     KEY idx_touch_log_chip (chip_id),
     KEY idx_touch_log_time (time_stamp),

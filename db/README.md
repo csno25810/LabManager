@@ -12,6 +12,7 @@ LabManager の開発用 MySQL スキーマ定義とサンプルデータ。
 | `migrate_003_add_references_list.sql` | 既存DBに `references_list` テーブルを追加（Form8 用） |
 | `migrate_004_add_personal_info_mail.sql` | 既存DBの `personal_info` に `mail` 列を追加 |
 | `migrate_005_add_chip_list_system_id.sql` | 既存DBの `chip_list` に `system_id` 列を追加 |
+| `migrate_006_add_touch_log_terminal_id.sql` | 既存DBの `touch_log` に `terminal_id` 列を追加 |
 
 ## 適用方法（ローカルMySQLに対して）
 
@@ -29,6 +30,7 @@ mysql -u root -p < db\migrate_002_add_diary_log.sql
 mysql -u root -p < db\migrate_003_add_references_list.sql
 mysql -u root -p < db\migrate_004_add_personal_info_mail.sql
 mysql -u root -p < db\migrate_005_add_chip_list_system_id.sql
+mysql -u root -p < db\migrate_006_add_touch_log_terminal_id.sql
 mysql -u root -p < db\seed.sql
 ```
 
