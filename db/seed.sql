@@ -58,3 +58,10 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO diary_log (student_id, dialy_date, title, content) VALUES
     ('7011', CURDATE(), '本日の作業', 'LabManager の schema 整備を進めた。'),
     ('7041', DATE_SUB(CURDATE(), INTERVAL 1 DAY), '文献調査', '関連論文を3本読んだ。');
+
+-- 文献サンプル（Form8 動作確認用）
+INSERT INTO references_list
+    (title, author, thesis_type, year, notes, url, site_name, open_date, reference_type, pages, genre)
+VALUES
+    ('Example Paper Title', 'Tanaka Taro', 'journal', '2024', 'Survey chapter 2', '', '', '2024-06-01', '', '12-20', '経路'),
+    ('Example Web Article', '', '', '2025', 'Useful reference page', 'https://example.com/article', 'Example Site', '2025-09-01', '', '', 'WEB');

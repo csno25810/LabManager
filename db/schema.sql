@@ -67,6 +67,24 @@ CREATE TABLE IF NOT EXISTS diary_log (
     KEY idx_diary_date (dialy_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 文献管理（Form8 が使用）
+-- 研究室DB (MySQL 5.1) の DESCRIBE 結果に合わせる。
+CREATE TABLE IF NOT EXISTS references_list (
+    id             INT          NOT NULL AUTO_INCREMENT,
+    title          VARCHAR(255) NOT NULL,
+    author         VARCHAR(255) NOT NULL,
+    thesis_type    VARCHAR(255) NULL,
+    year           VARCHAR(11)  NOT NULL,
+    notes          TEXT         NOT NULL,
+    url            VARCHAR(255) NULL,
+    site_name      VARCHAR(255) NULL,
+    open_date      VARCHAR(11)  NOT NULL,
+    reference_type VARCHAR(10)  NULL,
+    pages          VARCHAR(50)  NOT NULL,
+    genre          VARCHAR(50)  NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- アプリ用の専用ユーザー作成
 -- 古い MySql.Data 5.0.9 と互換を取るため mysql_native_password を使用
 CREATE USER IF NOT EXISTS 'labapp'@'localhost'

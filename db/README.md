@@ -6,9 +6,10 @@ LabManager の開発用 MySQL スキーマ定義とサンプルデータ。
 
 | ファイル | 内容 |
 |----------|------|
-| `schema.sql` | データベース `felica` とテーブル5つ（`personal_info` / `chip_list` / `touch_log` / `duty_schedule` / `diary_log`）、およびアプリ用ユーザー `labapp` を作成 |
-| `seed.sql`   | 開発・動作確認用のダミーデータを投入（当日のタッチ履歴・日直情報・日誌サンプルを含む） |
+| `schema.sql` | データベース `felica` とテーブル6つ（`personal_info` / `chip_list` / `touch_log` / `duty_schedule` / `diary_log` / `references_list`）、およびアプリ用ユーザー `labapp` を作成 |
+| `seed.sql`   | 開発・動作確認用のダミーデータを投入（当日のタッチ履歴・日直情報・日誌・文献サンプルを含む） |
 | `migrate_002_add_diary_log.sql` | 既存DBに `diary_log` テーブルを追加（Form6 用） |
+| `migrate_003_add_references_list.sql` | 既存DBに `references_list` テーブルを追加（Form8 用） |
 
 ## 適用方法（ローカルMySQLに対して）
 
@@ -23,6 +24,7 @@ mysql -u root -p < db\seed.sql
 
 ```powershell
 mysql -u root -p < db\migrate_002_add_diary_log.sql
+mysql -u root -p < db\migrate_003_add_references_list.sql
 mysql -u root -p < db\seed.sql
 ```
 
