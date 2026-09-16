@@ -187,7 +187,7 @@ namespace LabManager
             this.MaximizeBox = false;
             this.Name = "Form13";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "出席状況編集（デバッグ）";
+            this.Text = "出席状況編集";
             this.Load += new System.EventHandler(this.Form13_Load);
             ((System.ComponentModel.ISupportInitialize)(this.dataGridViewDuty)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridViewLog)).EndInit();

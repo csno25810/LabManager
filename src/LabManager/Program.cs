@@ -41,7 +41,7 @@ namespace LabManager
         public string DataBaseName = "felica";
         public int ReloadTime = 30;
         /// <summary>
-        /// 出席状況編集（デバッグ）のパスワード。空なら開発時はパスワード不要。
+        /// 出席状況編集のパスワード。空ならパスワード不要。
         /// SQLReader.ini の DebugPassword で設定する。
         /// </summary>
         public string DebugPassword = "";
@@ -269,7 +269,7 @@ namespace LabManager
     }
 
     /// <summary>
-    /// duty_schedule の手動編集ログ。開発デバッグ・不正防止用。
+    /// duty_schedule の手動編集ログ（不正防止用）。
     /// </summary>
     static class DutyAuditLog
     {

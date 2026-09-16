@@ -234,7 +234,7 @@ namespace LabManager
             this.button10.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button10.Size = new System.Drawing.Size(190, 39);
             this.button10.TabIndex = 14;
-            this.button10.Text = "出席状況編集（デバッグ）";
+            this.button10.Text = "出席状況編集";
             this.button10.UseVisualStyleBackColor = false;
             this.button10.Click += new System.EventHandler(this.button10_Click);
             //
