@@ -23,6 +23,31 @@ namespace LabManager
             InitializeComponent();
         }
 
+        /// <summary>
+        /// 旧 GoogleCalenderReader.exe 相当：画面左半分にフル表示する。
+        /// </summary>
+        public void ConfigureForTvDisplay()
+        {
+            int winHeight = Screen.PrimaryScreen.Bounds.Height - 50;
+            int winWidth = Screen.PrimaryScreen.Bounds.Width / 2;
+            const int headerHeight = 40;
+
+            FormBorderStyle = FormBorderStyle.None;
+            StartPosition = FormStartPosition.Manual;
+            Location = new Point(0, 0);
+            Size = new Size(winWidth, winHeight);
+
+            btnPrevMonth.Location = new Point(8, 6);
+            btnPrevMonth.Size = new Size(80, headerHeight - 12);
+            lblMonth.Location = new Point(96, 6);
+            lblMonth.Size = new Size(winWidth - 192, headerHeight - 12);
+            btnNextMonth.Location = new Point(winWidth - 88, 6);
+            btnNextMonth.Size = new Size(80, headerHeight - 12);
+
+            tableLayoutPanel1.Location = new Point(0, headerHeight);
+            tableLayoutPanel1.Size = new Size(winWidth, winHeight - headerHeight);
+        }
+
         private void Form10_Load(object sender, EventArgs e)
         {
             if (!calendarSet.ReadSetting())

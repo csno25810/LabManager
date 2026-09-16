@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using MySql.Data.MySqlClient;
 using System.Data;
@@ -8,12 +9,22 @@ namespace LabManager
 {
     static class Program
     {
+        /// <summary>
+        /// 研究室テレビPC用。Screen.bat から /tv で起動すると
+        /// メイン画面（右半分）と大学カレンダー（左半分）を同時表示する。
+        /// </summary>
+        public static bool TvMode { get; private set; }
+
         /// <summary>
         /// アプリケーションのメイン エントリ ポイントです。
         /// </summary>
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
+            TvMode = args.Any(arg =>
+                string.Equals(arg, "/tv", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(arg, "-tv", StringComparison.OrdinalIgnoreCase));
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
