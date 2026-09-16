@@ -11,6 +11,7 @@ USE felica;
 CREATE TABLE IF NOT EXISTS personal_info (
     student_id    VARCHAR(20)  NOT NULL,
     name          VARCHAR(50)  NOT NULL,
+    mail          VARCHAR(40)  NOT NULL,
     penalty_count INT          NOT NULL DEFAULT 0,
     PRIMARY KEY (student_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -4,15 +4,16 @@
 USE felica;
 
 -- 研究生情報
-INSERT INTO personal_info (student_id, name, penalty_count) VALUES
-    ('7011',  '田中 太郎', 0),
-    ('7041',  '佐藤 花子', 1),
-    ('7111',  '鈴木 一郎', 0),
-    ('7026',  '高橋 真理', 2),
-    ('M9013', '山田 次郎', 0),
-    ('M9014', '伊藤 美咲', 0)
+INSERT INTO personal_info (student_id, name, mail, penalty_count) VALUES
+    ('7011',  '田中 太郎', '7011@example.local', 0),
+    ('7041',  '佐藤 花子', '7041@example.local', 1),
+    ('7111',  '鈴木 一郎', '7111@example.local', 0),
+    ('7026',  '高橋 真理', '7026@example.local', 2),
+    ('M9013', '山田 次郎', 'm9013@example.local', 0),
+    ('M9014', '伊藤 美咲', 'm9014@example.local', 0)
 ON DUPLICATE KEY UPDATE
     name          = VALUES(name),
+    mail          = VALUES(mail),
     penalty_count = VALUES(penalty_count);
 
 -- NFCチップ対応
