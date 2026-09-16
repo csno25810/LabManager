@@ -33,6 +33,13 @@ namespace LabManager
             this.radioButton1 = new System.Windows.Forms.RadioButton();
             this.radioButton2 = new System.Windows.Forms.RadioButton();
             this.radioButton3 = new System.Windows.Forms.RadioButton();
+            this.radioButton4 = new System.Windows.Forms.RadioButton();
+            this.comboBoxPeriodReport = new System.Windows.Forms.ComboBox();
+            this.labelBegin = new System.Windows.Forms.Label();
+            this.labelEnd = new System.Windows.Forms.Label();
+            this.textBoxBegin = new System.Windows.Forms.TextBox();
+            this.textBoxEnd = new System.Windows.Forms.TextBox();
+            this.buttonExportCsv = new System.Windows.Forms.Button();
             this.textBox1 = new System.Windows.Forms.TextBox();
             this.textBox2 = new System.Windows.Forms.TextBox();
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
@@ -53,10 +60,76 @@ namespace LabManager
             this.radioButton1.Text = "日付指定";
             this.radioButton1.UseVisualStyleBackColor = true;
             // 
+            // radioButton4
+            // 
+            this.radioButton4.AutoSize = true;
+            this.radioButton4.Location = new System.Drawing.Point(12, 205);
+            this.radioButton4.Name = "radioButton4";
+            this.radioButton4.Size = new System.Drawing.Size(71, 16);
+            this.radioButton4.TabIndex = 9;
+            this.radioButton4.TabStop = true;
+            this.radioButton4.Text = "期間集計";
+            this.radioButton4.UseVisualStyleBackColor = true;
+            // 
+            // comboBoxPeriodReport
+            // 
+            this.comboBoxPeriodReport.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.comboBoxPeriodReport.FormattingEnabled = true;
+            this.comboBoxPeriodReport.Items.AddRange(new object[] {
+            "出勤回数",
+            "出勤時刻",
+            "全タッチ出力"});
+            this.comboBoxPeriodReport.Location = new System.Drawing.Point(89, 203);
+            this.comboBoxPeriodReport.Name = "comboBoxPeriodReport";
+            this.comboBoxPeriodReport.Size = new System.Drawing.Size(143, 20);
+            this.comboBoxPeriodReport.TabIndex = 10;
+            // 
+            // labelBegin
+            // 
+            this.labelBegin.AutoSize = true;
+            this.labelBegin.Location = new System.Drawing.Point(12, 232);
+            this.labelBegin.Name = "labelBegin";
+            this.labelBegin.Size = new System.Drawing.Size(29, 12);
+            this.labelBegin.TabIndex = 11;
+            this.labelBegin.Text = "開始";
+            // 
+            // labelEnd
+            // 
+            this.labelEnd.AutoSize = true;
+            this.labelEnd.Location = new System.Drawing.Point(12, 257);
+            this.labelEnd.Name = "labelEnd";
+            this.labelEnd.Size = new System.Drawing.Size(29, 12);
+            this.labelEnd.TabIndex = 12;
+            this.labelEnd.Text = "終了";
+            // 
+            // textBoxBegin
+            // 
+            this.textBoxBegin.Location = new System.Drawing.Point(47, 229);
+            this.textBoxBegin.Name = "textBoxBegin";
+            this.textBoxBegin.Size = new System.Drawing.Size(185, 19);
+            this.textBoxBegin.TabIndex = 13;
+            // 
+            // textBoxEnd
+            // 
+            this.textBoxEnd.Location = new System.Drawing.Point(47, 254);
+            this.textBoxEnd.Name = "textBoxEnd";
+            this.textBoxEnd.Size = new System.Drawing.Size(185, 19);
+            this.textBoxEnd.TabIndex = 14;
+            // 
+            // buttonExportCsv
+            // 
+            this.buttonExportCsv.Location = new System.Drawing.Point(122, 396);
+            this.buttonExportCsv.Name = "buttonExportCsv";
+            this.buttonExportCsv.Size = new System.Drawing.Size(110, 23);
+            this.buttonExportCsv.TabIndex = 15;
+            this.buttonExportCsv.Text = "CSV保存";
+            this.buttonExportCsv.UseVisualStyleBackColor = true;
+            this.buttonExportCsv.Click += new System.EventHandler(this.buttonExportCsv_Click);
+            // 
             // radioButton2
             // 
             this.radioButton2.AutoSize = true;
-            this.radioButton2.Location = new System.Drawing.Point(12, 238);
+            this.radioButton2.Location = new System.Drawing.Point(12, 285);
             this.radioButton2.Name = "radioButton2";
             this.radioButton2.Size = new System.Drawing.Size(95, 16);
             this.radioButton2.TabIndex = 1;
@@ -67,7 +140,7 @@ namespace LabManager
             // radioButton3
             // 
             this.radioButton3.AutoSize = true;
-            this.radioButton3.Location = new System.Drawing.Point(12, 293);
+            this.radioButton3.Location = new System.Drawing.Point(12, 340);
             this.radioButton3.Name = "radioButton3";
             this.radioButton3.Size = new System.Drawing.Size(80, 16);
             this.radioButton3.TabIndex = 2;
@@ -77,14 +150,14 @@ namespace LabManager
             // 
             // textBox1
             // 
-            this.textBox1.Location = new System.Drawing.Point(13, 261);
+            this.textBox1.Location = new System.Drawing.Point(13, 308);
             this.textBox1.Name = "textBox1";
             this.textBox1.Size = new System.Drawing.Size(219, 19);
             this.textBox1.TabIndex = 4;
             // 
             // textBox2
             // 
-            this.textBox2.Location = new System.Drawing.Point(13, 316);
+            this.textBox2.Location = new System.Drawing.Point(13, 363);
             this.textBox2.Name = "textBox2";
             this.textBox2.Size = new System.Drawing.Size(219, 19);
             this.textBox2.TabIndex = 5;
@@ -123,7 +196,7 @@ namespace LabManager
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(12, 367);
+            this.button1.Location = new System.Drawing.Point(12, 396);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(108, 23);
             this.button1.TabIndex = 7;
@@ -133,7 +206,7 @@ namespace LabManager
             // 
             // button2
             // 
-            this.button2.Location = new System.Drawing.Point(122, 367);
+            this.button2.Location = new System.Drawing.Point(12, 425);
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(110, 23);
             this.button2.TabIndex = 8;
@@ -152,7 +225,14 @@ namespace LabManager
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(839, 402);
+            this.ClientSize = new System.Drawing.Size(839, 460);
+            this.Controls.Add(this.buttonExportCsv);
+            this.Controls.Add(this.textBoxEnd);
+            this.Controls.Add(this.textBoxBegin);
+            this.Controls.Add(this.labelEnd);
+            this.Controls.Add(this.labelBegin);
+            this.Controls.Add(this.comboBoxPeriodReport);
+            this.Controls.Add(this.radioButton4);
             this.Controls.Add(this.button2);
             this.Controls.Add(this.button1);
             this.Controls.Add(this.dataGridView1);
@@ -176,6 +256,13 @@ namespace LabManager
         private System.Windows.Forms.RadioButton radioButton1;
         private System.Windows.Forms.RadioButton radioButton2;
         private System.Windows.Forms.RadioButton radioButton3;
+        private System.Windows.Forms.RadioButton radioButton4;
+        private System.Windows.Forms.ComboBox comboBoxPeriodReport;
+        private System.Windows.Forms.Label labelBegin;
+        private System.Windows.Forms.Label labelEnd;
+        private System.Windows.Forms.TextBox textBoxBegin;
+        private System.Windows.Forms.TextBox textBoxEnd;
+        private System.Windows.Forms.Button buttonExportCsv;
         private System.Windows.Forms.TextBox textBox1;
         private System.Windows.Forms.TextBox textBox2;
         private System.Windows.Forms.DataGridView dataGridView1;
