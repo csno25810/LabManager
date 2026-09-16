@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
-using System.Net;
-using System.Text;
 using System.Windows.Forms;
-using Ical.Net.DataTypes;
-using IcalCalendar = Ical.Net.Calendar;
 
 namespace LabManager
 {
+    /// <summary>
+    /// MENU から開く大学カレンダー。月移動など操作可能。
+    /// テレビ左画面の表示専用カレンダーは Form14。
+    /// </summary>
     public partial class Form10 : Form
     {
         private readonly CalendarSetting calendarSet = new CalendarSetting();
@@ -21,31 +21,6 @@ namespace LabManager
         public Form10(Setting settings)
         {
             InitializeComponent();
-        }
-
-        /// <summary>
-        /// 旧 GoogleCalenderReader.exe 相当：画面左半分にフル表示する。
-        /// </summary>
-        public void ConfigureForTvDisplay()
-        {
-            int winHeight = Screen.PrimaryScreen.Bounds.Height - 50;
-            int winWidth = Screen.PrimaryScreen.Bounds.Width / 2;
-            const int headerHeight = 40;
-
-            FormBorderStyle = FormBorderStyle.None;
-            StartPosition = FormStartPosition.Manual;
-            Location = new Point(0, 0);
-            Size = new Size(winWidth, winHeight);
-
-            btnPrevMonth.Location = new Point(8, 6);
-            btnPrevMonth.Size = new Size(80, headerHeight - 12);
-            lblMonth.Location = new Point(96, 6);
-            lblMonth.Size = new Size(winWidth - 192, headerHeight - 12);
-            btnNextMonth.Location = new Point(winWidth - 88, 6);
-            btnNextMonth.Size = new Size(80, headerHeight - 12);
-
-            tableLayoutPanel1.Location = new Point(0, headerHeight);
-            tableLayoutPanel1.Size = new Size(winWidth, winHeight - headerHeight);
         }
 
         private void Form10_Load(object sender, EventArgs e)
@@ -78,6 +53,7 @@ namespace LabManager
             DateTime firstDay = new DateTime(targetMonth.Year, targetMonth.Month, 1);
             int daysInMonth = DateTime.DaysInMonth(targetMonth.Year, targetMonth.Month);
             int dayOfWeek = (int)firstDay.DayOfWeek;
+            DateTime today = DateTime.Today;
 
             for (int day = 1; day <= daysInMonth; day++)
             {
@@ -86,23 +62,26 @@ namespace LabManager
                 int row = cellPosition / 7;
                 int col = cellPosition % 7;
 
-                var cell = new Panel { BorderStyle = BorderStyle.FixedSingle };
+                var cell = new Panel { BorderStyle = BorderStyle.FixedSingle, BackColor = Color.White };
                 var label = new Label
                 {
                     Text = day.ToString(),
                     Dock = DockStyle.Top,
-                    TextAlign = ContentAlignment.TopLeft
+                    TextAlign = ContentAlignment.TopLeft,
+                    Font = UiFonts.Get(11F, date.Date == today ? FontStyle.Bold : FontStyle.Regular),
+                    ForeColor = Color.Black
                 };
                 cell.Controls.Add(label);
 
                 if (classDays.Contains(date.Date))
                 {
-                    cell.BackColor = Color.LightBlue;
+                    cell.BackColor = Color.FromArgb(235, 235, 235);
                     var classLabel = new Label
                     {
                         Text = "授業日",
-                        ForeColor = Color.DarkBlue,
-                        Dock = DockStyle.Bottom
+                        ForeColor = Color.Black,
+                        Dock = DockStyle.Bottom,
+                        Font = UiFonts.Get(9F)
                     };
                     cell.Controls.Add(classLabel);
                 }
@@ -113,17 +92,12 @@ namespace LabManager
 
         private List<DateTime> LoadClassDays(DateTime targetMonth)
         {
-            var dates = new List<DateTime>();
-            string icsUrl = calendarSet.GetIcsUrl();
-            if (string.IsNullOrWhiteSpace(icsUrl))
-                return dates;
-
             try
             {
                 if (cachedIcsData == null)
-                    cachedIcsData = DownloadIcs(icsUrl);
+                    cachedIcsData = CalendarHelper.DownloadIcs(calendarSet);
 
-                dates = ParseIcsForEvents(cachedIcsData, targetMonth);
+                return CalendarHelper.GetEventDatesInMonth(cachedIcsData, targetMonth);
             }
             catch (Exception ex)
             {
@@ -133,59 +107,19 @@ namespace LabManager
                     "カレンダー取得エラー",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
+                return new List<DateTime>();
             }
-
-            return dates;
-        }
-
-        private static string DownloadIcs(string icsUrl)
-        {
-            using (var client = new WebClient { Encoding = Encoding.UTF8 })
-            {
-                return client.DownloadString(icsUrl);
-            }
-        }
-
-        /// <summary>
-        /// ICS から対象月のイベント日付を抽出する（Ical.Net 使用）
-        /// </summary>
-        private static List<DateTime> ParseIcsForEvents(string icsData, DateTime targetMonth)
-        {
-            var dates = new List<DateTime>();
-            if (string.IsNullOrWhiteSpace(icsData))
-                return dates;
-
-            var calendar = IcalCalendar.Load(icsData);
-            var monthStart = new DateTime(targetMonth.Year, targetMonth.Month, 1);
-            var monthEnd = monthStart.AddMonths(1);
-            var searchStart = new CalDateTime(monthStart);
-
-            foreach (var evt in calendar.Events)
-            {
-                foreach (var occurrence in evt.GetOccurrences(searchStart))
-                {
-                    var start = occurrence.Period.StartTime;
-                    if (start == null)
-                        continue;
-
-                    var date = start.Value.Date;
-                    if (date >= monthEnd)
-                        break;
-                    if (date >= monthStart)
-                        dates.Add(date);
-                }
-            }
-
-            return dates.Distinct().ToList();
         }
 
         private void buttonPrevMonth_Click(object sender, EventArgs e)
         {
+            cachedIcsData = null;
             DisplayCalendar(currentMonth.AddMonths(-1));
         }
 
         private void buttonNextMonth_Click(object sender, EventArgs e)
         {
+            cachedIcsData = null;
             DisplayCalendar(currentMonth.AddMonths(1));
         }
     }

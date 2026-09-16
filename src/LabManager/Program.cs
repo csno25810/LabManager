@@ -12,7 +12,7 @@ namespace LabManager
     {
         /// <summary>
         /// 研究室テレビPC用。Screen.bat から /tv で起動すると
-        /// メイン画面（右半分）と大学カレンダー（左半分）を同時表示する。
+        /// メイン画面（右半分）とテレビ左画面（左半分）を同時表示する。
         /// </summary>
         public static bool TvMode { get; private set; }
 

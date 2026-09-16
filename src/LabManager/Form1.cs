@@ -36,7 +36,7 @@ namespace LabManager
         string OnSeat = "在席";
         private System.Timers.Timer dailyTimer;
         private DateTime? lastPenaltyRunDate;
-        private Form10 tvCalendarForm;
+        private Form14 tvLeftPanel;
 
         public Form1()
         {
@@ -158,12 +158,12 @@ namespace LabManager
 
         private void Form1_Shown(object sender, EventArgs e)
         {
-            if (!Program.TvMode || tvCalendarForm != null)
+            if (!Program.TvMode || tvLeftPanel != null)
                 return;
 
-            tvCalendarForm = new Form10(mySqlSet);
-            tvCalendarForm.ConfigureForTvDisplay();
-            tvCalendarForm.Show(this);
+            tvLeftPanel = new Form14(mySqlSet);
+            tvLeftPanel.ConfigureForTvDisplay();
+            tvLeftPanel.Show(this);
         }
 
         // 接続状態をタイトルバーとタイマーに反映する

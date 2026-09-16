@@ -189,7 +189,7 @@ namespace LabManager
             this.button7.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button7.Size = new System.Drawing.Size(190, 39);
             this.button7.TabIndex = 11;
-            this.button7.Text = "カレンダーForm";
+            this.button7.Text = "大学カレンダー";
             this.button7.UseVisualStyleBackColor = false;
             this.button7.Click += new System.EventHandler(this.button7_Click_1);
             // 
