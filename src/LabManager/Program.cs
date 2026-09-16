@@ -40,6 +40,11 @@ namespace LabManager
         public string ServerIP = "127.0.0.1";
         public string DataBaseName = "felica";
         public int ReloadTime = 30;
+        /// <summary>
+        /// 出席状況編集（デバッグ）のパスワード。空なら開発時はパスワード不要。
+        /// SQLReader.ini の DebugPassword で設定する。
+        /// </summary>
+        public string DebugPassword = "";
 
         private string DirPos = "C:\\MyReader\\";
         private string FileName = "SQLReader.ini";
@@ -67,6 +72,8 @@ namespace LabManager
                 makeFile.WriteLine("ServerIP =" + ServerIP);
                 makeFile.WriteLine("ReloadTime =" + ReloadTime.ToString());
                 makeFile.WriteLine("DataBaseName =" + DataBaseName);
+                if (!string.IsNullOrEmpty(DebugPassword))
+                    makeFile.WriteLine("DebugPassword =" + DebugPassword);
             }
         }
 
@@ -106,6 +113,7 @@ namespace LabManager
                             case "ServerIP": ServerIP = value; break;
                             case "ReloadTime": ReloadTime = int.Parse(value); break;
                             case "DataBaseName": DataBaseName = value; break;
+                            case "DebugPassword": DebugPassword = value; break;
                         }
                     }
                 }
@@ -257,6 +265,61 @@ namespace LabManager
             {
                 MessageBox.Show("SQL 実行エラー\n" + ex.Message);
             }
+        }
+    }
+
+    /// <summary>
+    /// duty_schedule の手動編集ログ。開発デバッグ・不正防止用。
+    /// </summary>
+    static class DutyAuditLog
+    {
+        public static void EnsureTable()
+        {
+            const string sql = @"
+                CREATE TABLE IF NOT EXISTS duty_edit_log (
+                    id INT NOT NULL AUTO_INCREMENT,
+                    edited_at DATETIME NOT NULL,
+                    action VARCHAR(10) NOT NULL,
+                    duty_date DATE NOT NULL,
+                    student_id VARCHAR(20) NOT NULL,
+                    old_duty_status INT NULL,
+                    new_duty_status INT NULL,
+                    old_duty_type VARCHAR(10) NULL,
+                    new_duty_type VARCHAR(10) NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_duty_edit_time (edited_at),
+                    KEY idx_duty_edit_date (duty_date)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8";
+            Connector.ExecuteCommand(sql);
+        }
+
+        public static void Record(
+            string action,
+            string dutyDate,
+            string studentId,
+            int? oldStatus,
+            int? newStatus,
+            string oldType,
+            string newType)
+        {
+            string oldStatusSql = oldStatus.HasValue ? oldStatus.Value.ToString() : "NULL";
+            string newStatusSql = newStatus.HasValue ? newStatus.Value.ToString() : "NULL";
+            string oldTypeSql = oldType != null ? $"'{Escape(oldType)}'" : "NULL";
+            string newTypeSql = newType != null ? $"'{Escape(newType)}'" : "NULL";
+
+            string sql = $@"
+                INSERT INTO duty_edit_log
+                    (edited_at, action, duty_date, student_id,
+                     old_duty_status, new_duty_status, old_duty_type, new_duty_type)
+                VALUES
+                    (NOW(), '{Escape(action)}', '{Escape(dutyDate)}', '{Escape(studentId)}',
+                     {oldStatusSql}, {newStatusSql}, {oldTypeSql}, {newTypeSql})";
+            Connector.ExecuteCommand(sql);
+        }
+
+        private static string Escape(string value)
+        {
+            return (value ?? "").Replace("'", "''");
         }
     }
 }
