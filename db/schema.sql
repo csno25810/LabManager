@@ -56,6 +56,17 @@ CREATE TABLE IF NOT EXISTS duty_schedule (
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 日誌（Form6 が使用）
+-- 研究室DB (MySQL 5.1) と同じ列名に合わせる。dialy_date は旧DBの typo を踏襲。
+CREATE TABLE IF NOT EXISTS diary_log (
+    student_id  VARCHAR(20)  NOT NULL,
+    dialy_date  DATE         NOT NULL,
+    title       VARCHAR(255) NOT NULL,
+    content     TEXT         NOT NULL,
+    KEY idx_diary_student (student_id),
+    KEY idx_diary_date (dialy_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- アプリ用の専用ユーザー作成
 -- 古い MySql.Data 5.0.9 と互換を取るため mysql_native_password を使用
 CREATE USER IF NOT EXISTS 'labapp'@'localhost'

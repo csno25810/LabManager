@@ -53,3 +53,8 @@ ON DUPLICATE KEY UPDATE
     duty_status   = VALUES(duty_status),
     penalty_count = VALUES(penalty_count),
     duty_type     = VALUES(duty_type);
+
+-- 日誌サンプル（Form6 動作確認用）
+INSERT INTO diary_log (student_id, dialy_date, title, content) VALUES
+    ('7011', CURDATE(), '本日の作業', 'LabManager の schema 整備を進めた。'),
+    ('7041', DATE_SUB(CURDATE(), INTERVAL 1 DAY), '文献調査', '関連論文を3本読んだ。');
