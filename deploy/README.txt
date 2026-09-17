@@ -192,6 +192,7 @@
   [ ] 左半分に DB カレンダー（授業日・予定・日直苗字）が表示される
   [ ] MENU → CalendarEditor で授業日・予定の追加/削除ができる
   [ ] MENU → 日直管理 で曜日担当を保存できる
+  [ ] MENU → まとめページ で在席・日直・カレンダー・日誌が1画面に出る
   [ ] migrate_008 / migrate_009 適用済みである
   [ ] 「終了」でアプリが閉じる
 
@@ -241,3 +242,48 @@
 
   研究室 DB 調査ツール
     tools\lab_phase0\
+
+========================================
+  10. LAN 共有 MySQL（SQLReader.ini の ServerIP 切替）
+========================================
+
+LabManager の接続先は C:\MyReader\SQLReader.ini の ServerIP だけで切り替える。
+exe の再ビルドは不要。ini を保存して LabManager を起動し直す。
+
+【切替手順】
+  1. LabManager を終了する
+  2. C:\MyReader\SQLReader.ini を開く
+  3. ServerIP / UserID / PassWd / DataBaseName を接続先に合わせる
+
+     自宅ローカル MySQL（開発）:
+       UserID =labapp
+       PassWd =labapp_pw
+       ServerIP =127.0.0.1
+       DataBaseName =felica
+
+     研究室 LAN の共有 MySQL（例）:
+       UserID =Neko
+       PassWd =（研究室の既存値）
+       ServerIP =192.168.0.2
+       DataBaseName =felica
+
+  4. LabManager を起動する
+       タイトルが「LabManager」        → 接続成功
+       タイトルが「LabManager  [未接続]」→ ServerIP・権限・ファイアウォールを確認
+
+  アプリ内「設定」画面から書き換えても同じ ini に保存される。
+
+【研究室 MySQL を LAN から受け付ける場合（管理者作業）】
+  - mysqld が 3306 で待ち受けていること（my.ini の bind-address）
+  - 研究室PCのファイアウォールで TCP 3306 を許可
+  - 接続ユーザーに、開発PCの IP または同一セグメントからの権限があること
+    例: GRANT SELECT, INSERT, UPDATE, DELETE ON felica.* TO 'Neko'@'192.168.0.%';
+  - 開発用ユーザー labapp / labapp_pw は研究室DBに作らない
+    （リポジトリ既知のパスワードのため）
+
+【注意】
+  - 接続情報は Git にコミットしない
+  - 研究室DBへ seed_demo_reset.sql を流さない
+  - 自宅PCから研究室DBへ繋ぐのは同一 LAN にいるときだけ
+    （VPN が無い前提。遠隔は対象外）
+  - ReloadTime はメイン画面の自動更新間隔（秒）。接続先切替とは独立

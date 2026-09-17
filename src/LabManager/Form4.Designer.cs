@@ -249,7 +249,9 @@ namespace LabManager
             this.button11.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button11.Size = new System.Drawing.Size(190, 39);
             this.button11.TabIndex = 15;
+            this.button11.Text = "15:まとめページ";
             this.button11.UseVisualStyleBackColor = false;
+            this.button11.Click += new System.EventHandler(this.button11_Click);
             // 
             // button12
             // 

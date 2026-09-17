@@ -100,6 +100,14 @@ namespace LabManager
             }
         }
 
+        private void button11_Click(object sender, EventArgs e)
+        {
+            using (Form15 form15 = new Form15(mySqlSet))
+            {
+                form15.ShowDialog();
+            }
+        }
+
 
 
         private void label1_Click(object sender, EventArgs e)
