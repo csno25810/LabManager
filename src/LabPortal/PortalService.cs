@@ -64,6 +64,8 @@ namespace LabPortal
                 return HandleLogout();
             if (path == "/attendance")
                 return HandleAttendance(request);
+            if (path == "/me")
+                return HandleMyHistory(request);
 
             return HttpResponse.Html(Wrap("見つかりません", "<p>ページがありません。</p><p><a href=\"/\">トップ</a></p>"), 404);
         }
@@ -171,6 +173,15 @@ namespace LabPortal
             int visitors;
             List<AttendanceRow> rows = LoadAttendance(out present, out visitors);
             return HttpResponse.Html(AttendancePage(session, rows, present, visitors));
+        }
+
+        private HttpResponse HandleMyHistory(HttpRequest request)
+        {
+            PortalSession session = GetSession(request);
+            if (session == null)
+                return HttpResponse.Redirect("/login");
+
+            return HttpResponse.Html(MyHistoryPage(session, LoadMyHistory(session.StudentId)));
         }
 
         private PortalSession GetSession(HttpRequest request)
@@ -331,6 +342,162 @@ namespace LabPortal
             return conn;
         }
 
+        private sealed class DayVisit
+        {
+            public string Date { get; set; }
+            public string FirstTouch { get; set; }
+            public string LastTouch { get; set; }
+            public int TouchCount { get; set; }
+            public string EndState { get; set; }
+        }
+
+        private sealed class TouchEvent
+        {
+            public string Date { get; set; }
+            public string Time { get; set; }
+        }
+
+        private sealed class DutyEvent
+        {
+            public string Date { get; set; }
+            public string Status { get; set; }
+            public string Type { get; set; }
+        }
+
+        private sealed class MyHistory
+        {
+            public int VisitDays { get; set; }
+            public string TodayState { get; set; }
+            public string TodayFirst { get; set; }
+            public string TodayLast { get; set; }
+            public List<DayVisit> Days { get; set; }
+            public List<TouchEvent> Touches { get; set; }
+            public List<DutyEvent> Duties { get; set; }
+        }
+
+        private MyHistory LoadMyHistory(string studentId)
+        {
+            var history = new MyHistory
+            {
+                TodayState = "未来室",
+                TodayFirst = "-",
+                TodayLast = "-",
+                Days = new List<DayVisit>(),
+                Touches = new List<TouchEvent>(),
+                Duties = new List<DutyEvent>()
+            };
+
+            DateTime from = DateTime.Today.AddDays(-30);
+            string today = DateTime.Today.ToString("yyyy-MM-dd");
+
+            using (var conn = Open())
+            {
+                using (var cmd = new MySqlCommand(@"
+                    SELECT
+                        DATE_FORMAT(tl.time_stamp, '%Y-%m-%d') AS visit_date,
+                        DATE_FORMAT(MIN(tl.time_stamp), '%H:%i') AS first_touch,
+                        DATE_FORMAT(MAX(tl.time_stamp), '%H:%i') AS last_touch,
+                        COUNT(*) AS touch_count
+                    FROM touch_log tl
+                    INNER JOIN chip_list cl ON tl.chip_id = cl.chip_id
+                    WHERE cl.student_id = @sid
+                      AND tl.time_stamp >= @from
+                    GROUP BY DATE_FORMAT(tl.time_stamp, '%Y-%m-%d')
+                    ORDER BY visit_date DESC", conn))
+                {
+                    cmd.Parameters.AddWithValue("@sid", studentId);
+                    cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            int count = Convert.ToInt32(reader["touch_count"]);
+                            var day = new DayVisit
+                            {
+                                Date = Convert.ToString(reader["visit_date"]),
+                                FirstTouch = Convert.ToString(reader["first_touch"]),
+                                LastTouch = Convert.ToString(reader["last_touch"]),
+                                TouchCount = count,
+                                EndState = count % 2 == 1 ? "在席のまま" : "退室"
+                            };
+                            history.Days.Add(day);
+                            if (day.Date == today)
+                            {
+                                history.TodayFirst = day.FirstTouch;
+                                history.TodayLast = day.LastTouch;
+                                history.TodayState = count % 2 == 1 ? "在席" : "不在";
+                            }
+                        }
+                    }
+                }
+
+                history.VisitDays = history.Days.Count;
+
+                using (var cmd = new MySqlCommand(@"
+                    SELECT
+                        DATE_FORMAT(tl.time_stamp, '%Y-%m-%d') AS visit_date,
+                        DATE_FORMAT(tl.time_stamp, '%H:%i:%s') AS visit_time
+                    FROM touch_log tl
+                    INNER JOIN chip_list cl ON tl.chip_id = cl.chip_id
+                    WHERE cl.student_id = @sid
+                      AND tl.time_stamp >= @from
+                    ORDER BY tl.time_stamp DESC
+                    LIMIT 80", conn))
+                {
+                    cmd.Parameters.AddWithValue("@sid", studentId);
+                    cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            history.Touches.Add(new TouchEvent
+                            {
+                                Date = Convert.ToString(reader["visit_date"]),
+                                Time = Convert.ToString(reader["visit_time"])
+                            });
+                        }
+                    }
+                }
+
+                using (var cmd = new MySqlCommand(@"
+                    SELECT
+                        DATE_FORMAT(ds.duty_date, '%Y-%m-%d') AS duty_date,
+                        ds.duty_status,
+                        ds.duty_type
+                    FROM duty_schedule ds
+                    WHERE ds.student_id = @sid
+                    ORDER BY ds.duty_date DESC
+                    LIMIT 20", conn))
+                {
+                    cmd.Parameters.AddWithValue("@sid", studentId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            history.Duties.Add(new DutyEvent
+                            {
+                                Date = Convert.ToString(reader["duty_date"]),
+                                Status = FormatDutyStatus(Convert.ToString(reader["duty_status"])),
+                                Type = Convert.ToString(reader["duty_type"]) == "1" ? "罰直" : "通常"
+                            });
+                        }
+                    }
+                }
+            }
+
+            return history;
+        }
+
+        private static string FormatDutyStatus(string status)
+        {
+            switch (status)
+            {
+                case "1": return "出席";
+                case "2": return "遅刻";
+                default: return "未出席";
+            }
+        }
+
         private string LoginPage(string error)
         {
             string errorHtml = string.IsNullOrEmpty(error)
@@ -351,15 +518,10 @@ namespace LabPortal
                 HttpUtility.HtmlEncode(DefaultPassword) + " です。</p>");
         }
 
-        private static string AttendancePage(PortalSession session, List<AttendanceRow> rows, int present, int visitors)
+        private string AttendancePage(PortalSession session, List<AttendanceRow> rows, int present, int visitors)
         {
             var sb = new StringBuilder();
-            sb.Append("<header><div><strong>在席状況</strong><span class=\"muted\">　")
-                .Append(HttpUtility.HtmlEncode(session.Name))
-                .Append("（")
-                .Append(HttpUtility.HtmlEncode(session.Role))
-                .Append("）</span></div>")
-                .Append("<a href=\"/logout\">ログアウト</a></header>");
+            sb.Append(Nav(session, "attendance"));
             sb.Append("<p class=\"kpi\">在室 ").Append(present).Append(" 人　|　本日来室 ").Append(visitors).Append(" 人</p>");
             sb.Append("<p class=\"muted\">判定はテレビ右画面と同じです（当日タッチ奇数=在席）。30秒ごとに更新します。</p>");
             sb.Append("<table><thead><tr><th>学籍番号</th><th>氏名</th><th>初回</th><th>最終</th><th>状態</th></tr></thead><tbody>");
@@ -381,6 +543,95 @@ namespace LabPortal
             return html.Replace("</head>", "<meta http-equiv=\"refresh\" content=\"30\"></head>");
         }
 
+        private string MyHistoryPage(PortalSession session, MyHistory history)
+        {
+            var sb = new StringBuilder();
+            sb.Append(Nav(session, "me"));
+            sb.Append("<p class=\"kpi\">直近30日の来室 ").Append(history.VisitDays).Append(" 日")
+                .Append("　|　本日 ").Append(HttpUtility.HtmlEncode(history.TodayState))
+                .Append("　").Append(HttpUtility.HtmlEncode(history.TodayFirst))
+                .Append("〜").Append(HttpUtility.HtmlEncode(history.TodayLast))
+                .Append("</p>");
+            sb.Append("<p class=\"muted\">このページはログインした本人の記録だけを表示します。テレビには出ません。</p>");
+
+            sb.Append("<h2>来室日（直近30日）</h2>");
+            if (history.Days.Count == 0)
+            {
+                sb.Append("<p class=\"muted\">この期間の来室はありません。</p>");
+            }
+            else
+            {
+                sb.Append("<table><thead><tr><th>日付</th><th>初回</th><th>最終</th><th>タッチ</th><th>終了時</th></tr></thead><tbody>");
+                foreach (DayVisit day in history.Days)
+                {
+                    sb.Append("<tr>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(day.Date)).Append("</td>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(day.FirstTouch)).Append("</td>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(day.LastTouch)).Append("</td>")
+                        .Append("<td>").Append(day.TouchCount).Append("</td>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(day.EndState)).Append("</td>")
+                        .Append("</tr>");
+                }
+                sb.Append("</tbody></table>");
+            }
+
+            sb.Append("<h2>日直（直近20件）</h2>");
+            if (history.Duties.Count == 0)
+            {
+                sb.Append("<p class=\"muted\">日直の登録はありません。</p>");
+            }
+            else
+            {
+                sb.Append("<table><thead><tr><th>日付</th><th>種類</th><th>出席</th></tr></thead><tbody>");
+                foreach (DutyEvent duty in history.Duties)
+                {
+                    sb.Append("<tr>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(duty.Date)).Append("</td>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(duty.Type)).Append("</td>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(duty.Status)).Append("</td>")
+                        .Append("</tr>");
+                }
+                sb.Append("</tbody></table>");
+            }
+
+            sb.Append("<h2>タッチ履歴（直近30日・最大80件）</h2>");
+            if (history.Touches.Count == 0)
+            {
+                sb.Append("<p class=\"muted\">タッチ記録はありません。</p>");
+            }
+            else
+            {
+                sb.Append("<table><thead><tr><th>日付</th><th>時刻</th></tr></thead><tbody>");
+                foreach (TouchEvent touch in history.Touches)
+                {
+                    sb.Append("<tr>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(touch.Date)).Append("</td>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(touch.Time)).Append("</td>")
+                        .Append("</tr>");
+                }
+                sb.Append("</tbody></table>");
+            }
+
+            return Wrap("自分の履歴", sb.ToString());
+        }
+
+        private static string Nav(PortalSession session, string current)
+        {
+            string displayId = IsTeacher(session.StudentId) ? "" : session.LoginId;
+            return "<header><div><strong>" + HttpUtility.HtmlEncode(session.Name) + "</strong>" +
+                   "<span class=\"muted\">　" + HttpUtility.HtmlEncode(displayId) + "</span></div></header>" +
+                   "<nav>" +
+                   NavLink("/attendance", "全員の在席", current == "attendance") +
+                   NavLink("/me", "自分の履歴", current == "me") +
+                   "<a href=\"/logout\">ログアウト</a>" +
+                   "</nav>";
+        }
+
+        private static string NavLink(string href, string label, bool current)
+        {
+            return "<a href=\"" + href + "\"" + (current ? " class=\"current\"" : "") + ">" + label + "</a>";
+        }
+
         private static string Wrap(string title, string inner)
         {
             return "<!doctype html><html lang=\"ja\"><head><meta charset=\"utf-8\">" +
@@ -395,7 +646,10 @@ namespace LabPortal
                    "button{font-size:1rem;padding:12px;background:#111;color:#fff;border:0;}" +
                    ".error{color:#a40000;font-weight:bold;}" +
                    ".muted,.hint{color:#666;font-size:.9rem;}" +
-                   "header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;}" +
+                   "header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;}" +
+                   "nav{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #ccc;}" +
+                   "nav a.current{font-weight:bold;}" +
+                   "h2{font-size:1.1rem;margin:20px 0 8px;}" +
                    ".kpi{background:#fff;border:1px solid #111;padding:12px;font-weight:bold;text-align:center;}" +
                    "table{width:100%;border-collapse:collapse;background:#fff;}" +
                    "th,td{border:1px solid #ccc;padding:8px;text-align:center;}" +

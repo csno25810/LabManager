@@ -4,6 +4,7 @@
 
 テレビ用 LabManager とは別アプリです。
 同じ MySQL（felica）を読み、ブラウザからログインして在席を見ます。
+「自分の履歴」では、ログインした本人の来室日・タッチ・日直だけを表示します。
 
 【ビルド】
   MSBuild LabManager.sln /p:Configuration=Release /p:Platform=x86
@@ -13,6 +14,7 @@
   1. C:\MyReader\SQLReader.ini があること（LabManager と同じ）
   2. bin\Release\LabPortal.exe を起動
   3. ブラウザで http://localhost:8080/ を開く
+     ログイン後、「全員の在席」と「自分の履歴」を切り替えられる。
   ポートを変える場合: LabPortal.exe 8081
 
 【ログイン】

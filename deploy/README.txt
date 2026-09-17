@@ -294,7 +294,7 @@ exe の再ビルドは不要。ini を保存して LabManager を起動し直す
 ========================================
 
 テレビ用 LabManager とは別 exe。同じ SQLReader.ini で MySQL に接続し、
-ブラウザからログインして在席を見る。個人カルテはまだ出さない。
+ブラウザからログインして在席を見る。「自分の履歴」は本人のタッチ・日直のみ。
 
   起動: bin\Release\LabPortal.exe
   URL : http://localhost:8080/
