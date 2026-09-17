@@ -66,6 +66,8 @@ namespace LabPortal
                 return HandleAttendance(request);
             if (path == "/me")
                 return HandleMyHistory(request);
+            if (path == "/password")
+                return HandlePassword(request);
 
             return HttpResponse.Html(Wrap("見つかりません", "<p>ページがありません。</p><p><a href=\"/\">トップ</a></p>"), 404);
         }
@@ -182,6 +184,34 @@ namespace LabPortal
                 return HttpResponse.Redirect("/login");
 
             return HttpResponse.Html(MyHistoryPage(session, LoadMyHistory(session.StudentId)));
+        }
+
+        private HttpResponse HandlePassword(HttpRequest request)
+        {
+            PortalSession session = GetSession(request);
+            if (session == null)
+                return HttpResponse.Redirect("/login");
+
+            if (request.Method != "POST")
+                return HttpResponse.Html(PasswordPage(session, "", ""));
+
+            string current = request.FormValue("current_password") ?? "";
+            string next = request.FormValue("new_password") ?? "";
+            string confirm = request.FormValue("confirm_password") ?? "";
+
+            if (current.Length == 0 || next.Length == 0 || confirm.Length == 0)
+                return HttpResponse.Html(PasswordPage(session, "すべての項目を入力してください。", ""));
+            if (next != confirm)
+                return HttpResponse.Html(PasswordPage(session, "新しいパスワードが一致しません。", ""));
+            if (next.Length < 8)
+                return HttpResponse.Html(PasswordPage(session, "新しいパスワードは8文字以上にしてください。", ""));
+            if (!VerifyLoginPassword(session.LoginId, current))
+                return HttpResponse.Html(PasswordPage(session, "現在のパスワードが違います。", ""));
+
+            if (!UpdatePassword(session.LoginId, next))
+                return HttpResponse.Html(PasswordPage(session, "保存に失敗しました。", ""));
+
+            return HttpResponse.Html(PasswordPage(session, "", "パスワードを変更しました。"));
         }
 
         private PortalSession GetSession(HttpRequest request)
@@ -615,6 +645,54 @@ namespace LabPortal
             return Wrap("自分の履歴", sb.ToString());
         }
 
+        private string PasswordPage(PortalSession session, string error, string ok)
+        {
+            string errorHtml = string.IsNullOrEmpty(error)
+                ? ""
+                : "<p class=\"error\">" + HttpUtility.HtmlEncode(error) + "</p>";
+            string okHtml = string.IsNullOrEmpty(ok)
+                ? ""
+                : "<p class=\"ok\">" + HttpUtility.HtmlEncode(ok) + "</p>";
+
+            return Wrap("パスワード変更",
+                Nav(session, "password") +
+                "<h1>パスワード変更</h1>" +
+                "<p class=\"muted\">ログイン中の自分のパスワードだけを変更します。</p>" +
+                errorHtml + okHtml +
+                "<form method=\"post\" action=\"/password\">" +
+                "<label>現在のパスワード<br><input name=\"current_password\" type=\"password\" autocomplete=\"current-password\" required></label>" +
+                "<label>新しいパスワード（8文字以上）<br><input name=\"new_password\" type=\"password\" autocomplete=\"new-password\" required></label>" +
+                "<label>新しいパスワード（確認）<br><input name=\"confirm_password\" type=\"password\" autocomplete=\"new-password\" required></label>" +
+                "<button type=\"submit\">変更する</button>" +
+                "</form>");
+        }
+
+        private bool VerifyLoginPassword(string loginId, string password)
+        {
+            using (var conn = Open())
+            using (var cmd = new MySqlCommand(
+                "SELECT password_hash FROM lab_user WHERE login_id = @login LIMIT 1", conn))
+            {
+                cmd.Parameters.AddWithValue("@login", loginId);
+                object value = cmd.ExecuteScalar();
+                if (value == null || value == DBNull.Value)
+                    return false;
+                return VerifyPassword(password, Convert.ToString(value));
+            }
+        }
+
+        private bool UpdatePassword(string loginId, string newPassword)
+        {
+            using (var conn = Open())
+            using (var cmd = new MySqlCommand(
+                "UPDATE lab_user SET password_hash = @hash WHERE login_id = @login", conn))
+            {
+                cmd.Parameters.AddWithValue("@hash", HashPassword(newPassword));
+                cmd.Parameters.AddWithValue("@login", loginId);
+                return cmd.ExecuteNonQuery() == 1;
+            }
+        }
+
         private static string Nav(PortalSession session, string current)
         {
             string displayId = IsTeacher(session.StudentId) ? "" : session.LoginId;
@@ -623,6 +701,7 @@ namespace LabPortal
                    "<nav>" +
                    NavLink("/attendance", "全員の在席", current == "attendance") +
                    NavLink("/me", "自分の履歴", current == "me") +
+                   NavLink("/password", "パスワード", current == "password") +
                    "<a href=\"/logout\">ログアウト</a>" +
                    "</nav>";
         }
@@ -645,6 +724,7 @@ namespace LabPortal
                    "input{font-size:1rem;padding:10px;width:100%;box-sizing:border-box;}" +
                    "button{font-size:1rem;padding:12px;background:#111;color:#fff;border:0;}" +
                    ".error{color:#a40000;font-weight:bold;}" +
+                   ".ok{color:#0a5a0a;font-weight:bold;}" +
                    ".muted,.hint{color:#666;font-size:.9rem;}" +
                    "header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;}" +
                    "nav{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #ccc;}" +
