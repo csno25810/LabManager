@@ -203,8 +203,8 @@ namespace LabPortal
                 return HttpResponse.Html(PasswordPage(session, "すべての項目を入力してください。", ""));
             if (next != confirm)
                 return HttpResponse.Html(PasswordPage(session, "新しいパスワードが一致しません。", ""));
-            if (next.Length < 8)
-                return HttpResponse.Html(PasswordPage(session, "新しいパスワードは8文字以上にしてください。", ""));
+            if (next.Length < 4)
+                return HttpResponse.Html(PasswordPage(session, "新しいパスワードは4文字以上にしてください。", ""));
             if (!VerifyLoginPassword(session.LoginId, current))
                 return HttpResponse.Html(PasswordPage(session, "現在のパスワードが違います。", ""));
 
@@ -661,7 +661,7 @@ namespace LabPortal
                 errorHtml + okHtml +
                 "<form method=\"post\" action=\"/password\">" +
                 "<label>現在のパスワード<br><input name=\"current_password\" type=\"password\" autocomplete=\"current-password\" required></label>" +
-                "<label>新しいパスワード（8文字以上）<br><input name=\"new_password\" type=\"password\" autocomplete=\"new-password\" required></label>" +
+                "<label>新しいパスワード（4文字以上）<br><input name=\"new_password\" type=\"password\" autocomplete=\"new-password\" required></label>" +
                 "<label>新しいパスワード（確認）<br><input name=\"confirm_password\" type=\"password\" autocomplete=\"new-password\" required></label>" +
                 "<button type=\"submit\">変更する</button>" +
                 "</form>");
