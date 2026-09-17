@@ -121,6 +121,7 @@
     db\migrate_007_add_duty_edit_log.sql       … 出席状況編集ログ
     db\migrate_008_add_lab_calendar_day.sql    … 授業日・予定（必須）
     db\migrate_009_add_duty_weekday_roster.sql … 曜日別日直（必須）
+    db\migrate_010_add_lab_user.sql            … マルチデバイスログイン（LabPortal。初回起動でも作成）
 
   seed.sql は学生マスタのみ更新し、カレンダー・日直データは消さない。
   デモ初期化が必要なときだけ db\seed_demo_reset.sql を使う。
@@ -287,3 +288,20 @@ exe の再ビルドは不要。ini を保存して LabManager を起動し直す
   - 自宅PCから研究室DBへ繋ぐのは同一 LAN にいるときだけ
     （VPN が無い前提。遠隔は対象外）
   - ReloadTime はメイン画面の自動更新間隔（秒）。接続先切替とは独立
+
+========================================
+  11. LabPortal（マルチデバイス在席確認）
+========================================
+
+テレビ用 LabManager とは別 exe。同じ SQLReader.ini で MySQL に接続し、
+ブラウザからログインして在席を見る。個人カルテはまだ出さない。
+
+  起動: bin\Release\LabPortal.exe
+  URL : http://localhost:8080/
+  学生: 学籍番号 / 初期パスワード lab2026
+  先生: teacher / lab2026
+
+  同一 LAN のスマホは、コンソールに出る http://<PCのIP>:8080/ を開く。
+  Windows ファイアウォールで TCP 8080 を許可すること。
+
+  詳細: src\LabPortal\README.txt

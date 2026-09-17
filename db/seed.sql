@@ -1,6 +1,7 @@
 -- LabManager: 開発用マスタデータ（学生・先生）
 -- ※ lab_calendar_day / duty_weekday_roster / duty_schedule は削除しません。
 --    カレンダー・日直データを初期化したい場合のみ seed_demo_reset.sql を使ってください。
+-- ※ lab_user（LabPortal ログイン）も削除しません。初期ユーザは LabPortal 初回起動で作ります。
 -- 実行例: mysql --default-character-set=utf8mb4 -u labapp -p felica < db\seed.sql
 
 USE felica;

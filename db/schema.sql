@@ -104,6 +104,17 @@ CREATE TABLE IF NOT EXISTS lab_calendar_day (
     PRIMARY KEY (calendar_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- マルチデバイス用ログイン（LabPortal）
+-- パスワードはアプリ側で PBKDF2 ハッシュ。初期ユーザは LabPortal 初回起動で作成。
+CREATE TABLE IF NOT EXISTS lab_user (
+    login_id      VARCHAR(40)  NOT NULL,
+    student_id    VARCHAR(20)  NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role          VARCHAR(20)  NOT NULL DEFAULT 'student',
+    PRIMARY KEY (login_id),
+    KEY idx_lab_user_student (student_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 -- アプリ用の専用ユーザー作成
 -- 古い MySql.Data 5.0.9 と互換を取るため mysql_native_password を使用
 CREATE USER IF NOT EXISTS 'labapp'@'localhost'

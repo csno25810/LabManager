@@ -17,6 +17,7 @@ LabManager の開発用 MySQL スキーマ定義とサンプルデータ。
 | `migrate_007_add_duty_edit_log.sql` | 出席状況編集ログ `duty_edit_log` テーブルを追加 |
 | `migrate_008_add_lab_calendar_day.sql` | 授業日・予定メモ `lab_calendar_day` テーブルを追加 |
 | `migrate_009_add_duty_weekday_roster.sql` | 曜日別日直担当 `duty_weekday_roster` テーブルを追加 |
+| `migrate_010_add_lab_user.sql` | マルチデバイスログイン `lab_user` テーブルを追加（LabPortal） |
 | `fix_personal_info_names.sql` | 氏名が `????` 化した personal_info を修復 |
 
 ## 適用方法（ローカルMySQLに対して）
@@ -45,6 +46,7 @@ mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_006_add_tou
 mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_007_add_duty_edit_log.sql
 mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_008_add_lab_calendar_day.sql
 mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_009_add_duty_weekday_roster.sql
+mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_010_add_lab_user.sql
 mysql -u root -p --default-character-set=utf8mb4 felica < db\seed.sql
 ```
 
@@ -174,6 +176,17 @@ Form5 で設定。授業日追加時に `duty_schedule` へ自動登録（土曜
 | new_duty_status | INT | 変更後の出席状況（NULL 可） |
 | old_duty_type | VARCHAR | 変更前の種類 |
 | new_duty_type | VARCHAR | 変更後の種類 |
+
+#### lab_user（マルチデバイスログイン）— LabPortal
+
+| 列 | 型 | 意味 |
+|----|-----|------|
+| login_id | VARCHAR | ログインID（学生は学籍番号、先生は `teacher`） |
+| student_id | VARCHAR | personal_info の学籍番号 |
+| password_hash | VARCHAR | PBKDF2 ハッシュ（平文は保存しない） |
+| role | VARCHAR | `student` / `teacher` / `admin`（権限の細分化は今後） |
+
+LabPortal 初回起動時、`personal_info` から行を作成する（初期パスワード `lab2026`）。既存行は消さない。テレビ用 LabManager はこの表を使わない。
 
 #### diary_log（日誌）— 先輩機能
 

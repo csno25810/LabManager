@@ -5,6 +5,8 @@ VisualStudioVersion = 17.12.35707.178
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LabManager", "src\LabManager\LabManager.csproj", "{B27E4E1C-EB65-48CF-8AB4-002254C0DC98}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LabPortal", "src\LabPortal\LabPortal.csproj", "{7C3E9F12-4A8B-4D21-9E6F-1B8C0D4E5F67}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x86 = Debug|x86
@@ -15,6 +17,10 @@ Global
 		{B27E4E1C-EB65-48CF-8AB4-002254C0DC98}.Debug|x86.Build.0 = Debug|x86
 		{B27E4E1C-EB65-48CF-8AB4-002254C0DC98}.Release|x86.ActiveCfg = Release|x86
 		{B27E4E1C-EB65-48CF-8AB4-002254C0DC98}.Release|x86.Build.0 = Release|x86
+		{7C3E9F12-4A8B-4D21-9E6F-1B8C0D4E5F67}.Debug|x86.ActiveCfg = Debug|x86
+		{7C3E9F12-4A8B-4D21-9E6F-1B8C0D4E5F67}.Debug|x86.Build.0 = Debug|x86
+		{7C3E9F12-4A8B-4D21-9E6F-1B8C0D4E5F67}.Release|x86.ActiveCfg = Release|x86
+		{7C3E9F12-4A8B-4D21-9E6F-1B8C0D4E5F67}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
