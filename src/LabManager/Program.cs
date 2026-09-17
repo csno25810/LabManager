@@ -257,14 +257,57 @@ namespace LabManager
 
         public static void ExecuteCommand(string sql)
         {
-            if (!IsConnected) return;
+            if (!TryExecuteCommand(sql, out string errorMessage))
+                MessageBox.Show("SQL 実行エラー\n" + errorMessage);
+        }
+
+        /// <summary>
+        /// MessageBox を出さず SQL を実行（カレンダー等の内部処理向け）
+        /// </summary>
+        public static bool TryExecuteCommand(string sql, out string errorMessage)
+        {
+            errorMessage = null;
+            if (!IsConnected)
+            {
+                errorMessage = "データベースに接続されていません。";
+                return false;
+            }
+
             try
             {
                 new MySqlCommand(sql, conn).ExecuteNonQuery();
+                return true;
             }
             catch (MySqlException ex)
             {
-                MessageBox.Show("SQL 実行エラー\n" + ex.Message);
+                errorMessage = ex.Message;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// MessageBox を出さず SELECT を実行（カレンダー等の内部処理向け）
+        /// </summary>
+        public static bool TryTableReader(string sql, DataTable table, out string errorMessage)
+        {
+            errorMessage = null;
+            table.Clear();
+            if (!IsConnected)
+            {
+                errorMessage = "データベースに接続されていません。";
+                return false;
+            }
+
+            try
+            {
+                var da = new MySqlDataAdapter(sql, conn);
+                da.Fill(table);
+                return true;
+            }
+            catch (MySqlException ex)
+            {
+                errorMessage = ex.Message;
+                return false;
             }
         }
     }

@@ -1,0 +1,98 @@
+============================================================
+LabManager 移行用 DB 情報 (Phase 0)
+取得日時: 2026-06-17 14:58:42
+============================================================
+
+[接続情報]
+  接続先ホスト: localhost
+  ユーザー    : Neko
+  データベース: felica
+  ini ファイル: C:\MyReader\SQLReader.ini
+
+[MySQL バージョン]
+  5.1.41
+
+[現在の DB]
+  felica
+
+[テーブル一覧] (12 件)
+  - chip_list
+  - class_info
+  - diary_log
+  - duty_schedule
+  - personal_info
+  - personal_info?back
+  - references_list
+  - semester
+  - terminal_info
+  - timetable
+  - touch_log
+  - touch_log2
+
+------------------------------------------------------------
+[DESCRIBE personal_info]
+  Field                Type                 Null   Key    Default
+  student_id           varchar(10)          NO            None
+  name                 varchar(40)          NO            None
+  mail                 varchar(40)          NO            None
+  penalty_count        int(11)              NO            None
+
+------------------------------------------------------------
+[DESCRIBE chip_list]
+  Field                Type                 Null   Key    Default
+  chip_id              varchar(20)          NO            None
+  student_id           varchar(10)          NO            None
+  system_id            varchar(10)          NO            None
+
+------------------------------------------------------------
+[DESCRIBE touch_log]
+  Field                Type                 Null   Key    Default
+  time_stamp           datetime             NO     MUL    None
+  terminal_id          varchar(10)          NO            None
+  chip_id              varchar(20)          NO            None
+
+------------------------------------------------------------
+[DESCRIBE duty_schedule]
+  Field                Type                 Null   Key    Default
+  duty_date            date                 NO     PRI    None
+  student_id           varchar(11)          NO     PRI    None
+  duty_status          int(11)              NO            None
+  penalty_count        int(11)              NO            None
+  duty_type            int(1)               NO            0
+
+------------------------------------------------------------
+[DESCRIBE diary_log]
+  Field                Type                 Null   Key    Default
+  student_id           varchar(11)          NO            None
+  dialy_date           date                 NO            None
+  title                varchar(255)         NO            None
+  content              text                 NO            None
+
+------------------------------------------------------------
+[DESCRIBE references_list]
+  Field                Type                 Null   Key    Default
+  id                   int(11)              NO     PRI    None
+  title                varchar(255)         NO            None
+  author               varchar(255)         NO            None
+  thesis_type          varchar(255)         YES           None
+  year                 varchar(11)          NO            None
+  notes                text                 NO            None
+  url                  varchar(255)         YES           None
+  site_name            varchar(255)         YES           None
+  open_date            varchar(11)          NO            None
+  reference_type       varchar(10)          YES           None
+  pages                varchar(50)          NO            None
+  genre                varchar(50)          NO            None
+
+------------------------------------------------------------
+[LabManager が追加で使うテーブル/列の有無]
+  personal_info.penalty_count: あり
+  duty_schedule: あり
+  diary_log: あり
+  references_list: あり
+
+------------------------------------------------------------
+[バックアップ (mysqldump) の案内]
+  mysqldump.exe の場所: C:\xampp\mysql\bin\mysqldump.exe
+  実行例 (PowerShell):
+    & "C:\xampp\mysql\bin\mysqldump.exe" -u Neko -p felica > backup_felica.sql

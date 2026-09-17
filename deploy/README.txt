@@ -5,6 +5,7 @@
 【目的】
   旧 MySQL_ConnectionTest.exe + GoogleCalenderReader.exe を
   LabManager 1 本に置き換え、Screen.bat から起動する。
+  左半分のカレンダーは Google 連携ではなく DB（lab_calendar_day）を表示する。
 
 【対象環境（研究室実機）】
   OS       : Windows 10/11（テレビPC）
@@ -15,9 +16,10 @@
 
 【旧システムとの対応】
   旧 Screen.bat
-    start MySQL_ConnectionTest.exe   → LabManager.exe /tv（画面右半分）
-    start GoogleCalenderReader.exe   → 同上 /tv 起動時に大学カレンダー（左半分）
-  設定ファイルの場所は変更なし: C:\MyReader\
+    start MySQL_ConnectionTest.exe   → LabManager.exe（画面右半分・在席・日直）
+    start GoogleCalenderReader.exe   → 廃止（LabManager 起動時に Form14 が左半分を表示）
+  設定ファイルの場所は変更なし: C:\MyReader\SQLReader.ini
+  GoogleCalenderReader.ini は不要（残っていても無視される）。
 
 ========================================
   1. 開発PCでビルド
@@ -92,16 +94,7 @@
   初回起動で ini が無い場合、アプリ内「設定」画面から入力すると
   C:\MyReader\SQLReader.ini が自動作成される。
 
-  ── GoogleCalenderReader.ini（大学カレンダー）──
-  例:
-    CalenderName =izl.schedule@gmail.com
-    DefaultQuery =/private-xxxxxxxx/basic
-    ReloadTime =100
-
-  IcsUrl キーがあればそちらを優先する。
-  旧 GoogleCalenderReader.ini をそのままコピーすれば動く。
-
-  ※ パスワード・秘密 URL は Git にコミットしないこと。
+  ※ DB 接続情報・パスワードは Git にコミットしないこと。
 
 ========================================
   4. データベース（MySQL 5.1 注意）
@@ -109,22 +102,28 @@
 
   LabManager が参照する主なテーブル:
     personal_info, chip_list, touch_log, duty_schedule,
-    diary_log, references_list
+    duty_weekday_roster, lab_calendar_day,
+    diary_log, references_list, duty_edit_log
 
-  研究室 DB（2026-06 時点の Phase0 調査）では上記は既に存在。
-  新規列が足りない場合のみ db\migrate_*.sql を適用する。
+  研究室 DB（2026-06 時点の Phase0 調査）ではコア表は既に存在。
+  新規列・新規表が足りない場合のみ db\migrate_*.sql を適用する。
 
   [適用前に必ずバックアップ]
     mysqldump 例:
       "C:\xampp\mysql\bin\mysqldump.exe" -u Neko -p felica > backup_felica.sql
 
   [マイグレーション（必要なものだけ）]
-    db\migrate_002_add_diary_log.sql        … 日誌Form 用
-    db\migrate_003_add_references_list.sql  … 文献管理 用
+    db\migrate_002_add_diary_log.sql           … 日誌Form 用
+    db\migrate_003_add_references_list.sql     … 文献管理 用
     db\migrate_004_add_personal_info_mail.sql
     db\migrate_005_add_chip_list_system_id.sql
     db\migrate_006_add_touch_log_terminal_id.sql
-    db\migrate_001_add_penalty_count.sql    … 罰直・日直管理 用
+    db\migrate_007_add_duty_edit_log.sql       … 出席状況編集ログ
+    db\migrate_008_add_lab_calendar_day.sql    … 授業日・予定（必須）
+    db\migrate_009_add_duty_weekday_roster.sql … 曜日別日直（必須）
+
+  seed.sql は学生マスタのみ更新し、カレンダー・日直データは消さない。
+  デモ初期化が必要なときだけ db\seed_demo_reset.sql を使う。
 
   実行例（MySQL 5.1 / コマンドプロンプト）:
     "C:\xampp\mysql\bin\mysql.exe" -u Neko -p felica < migrate_002_add_diary_log.sql
@@ -163,13 +162,12 @@
   3. 表示ツール\Screen.bat をダブルクリック
 
   正常時:
-    - 画面左半分: 大学カレンダー
-    - 画面右半分: メイン画面（出勤・日直）
+    - 画面左半分: DBカレンダー（TvCalendarPanel / Form14）
+    - 画面右半分: メイン画面（在席・日直・先生行）
     - タイトルバー: LabManager（未接続時は [未接続]）
 
   開発PCで単体確認するとき:
-    bin\Release\LabManager.exe          … メイン画面のみ
-    bin\Release\LabManager.exe /tv      … テレビPC と同じ2画面
+    bin\Release\LabManager.exe          … 右半分 + 左カレンダーが自動表示
 
   Windows ログイン時に自動起動させる場合:
     Screen.bat のショートカットを
@@ -190,12 +188,11 @@
 ========================================
 
   [ ] Screen.bat で LabManager が起動する
-  [ ] メイン画面に当日のタッチ情報または日直が表示される
-  [ ] 左半分に大学カレンダーが表示される（ini ありの場合）
-  [ ] MENU → 統合管理メニューから各機能が開ける
-        日直管理 / 日直変更 / カスタム検索 / 日誌Form /
-        文献管理 / 日直登録 / カレンダー /
-        学生情報管理 / カード管理
+  [ ] 右画面に全学生（学籍番号順）と先生行が表示される
+  [ ] 左半分に DB カレンダー（授業日・予定・日直苗字）が表示される
+  [ ] MENU → CalendarEditor で授業日・予定の追加/削除ができる
+  [ ] MENU → 日直管理 で曜日担当を保存できる
+  [ ] migrate_008 / migrate_009 適用済みである
   [ ] 「終了」でアプリが閉じる
 
   DB 中身の事前調査には tools\lab_phase0\ を使う（Python 単体）。
@@ -214,9 +211,9 @@
     → SQLReader.ini / MySQL 起動 / ユーザー権限を確認
     → アプリは未接続モードで起動する（UI は触れる）
 
-  ■ カレンダー設定が見つかりません
-    → C:\MyReader\GoogleCalenderReader.ini を配置
-    → メイン画面は動く。カレンダーだけ未設定
+  ■ 左カレンダーが空 / 授業日が反映されない
+    → migrate_008_add_lab_calendar_day.sql を適用
+    → MENU → CalendarEditor で授業日を設定
 
   ■ 当日タッチが無い
     → 正常（警告は出さない仕様）。日直表示は DB の duty_schedule 次第

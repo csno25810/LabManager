@@ -68,7 +68,7 @@ namespace LabManager
             this.button2.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button2.Size = new System.Drawing.Size(189, 39);
             this.button2.TabIndex = 5;
-            this.button2.Text = "日直管理システム";
+            this.button2.Text = "5:日直管理システム";
             this.button2.UseVisualStyleBackColor = false;
             this.button2.Click += new System.EventHandler(this.button2_Click);
             // 
@@ -83,7 +83,7 @@ namespace LabManager
             this.button3.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button3.Size = new System.Drawing.Size(189, 39);
             this.button3.TabIndex = 7;
-            this.button3.Text = "日直変更";
+            this.button3.Text = "7:日直変更";
             this.button3.UseVisualStyleBackColor = false;
             this.button3.Click += new System.EventHandler(this.button3_Click_1);
             // 
@@ -98,7 +98,7 @@ namespace LabManager
             this.button1.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button1.Size = new System.Drawing.Size(190, 39);
             this.button1.TabIndex = 6;
-            this.button1.Text = "カスタム検索";
+            this.button1.Text = "3:カスタム検索";
             this.button1.UseVisualStyleBackColor = false;
             this.button1.Click += new System.EventHandler(this.button1_Click_1);
             // 
@@ -113,7 +113,7 @@ namespace LabManager
             this.button4.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button4.Size = new System.Drawing.Size(190, 39);
             this.button4.TabIndex = 8;
-            this.button4.Text = "日誌提出Form";
+            this.button4.Text = "6:日誌提出Form";
             this.button4.UseVisualStyleBackColor = false;
             this.button4.Click += new System.EventHandler(this.button4_Click_1);
             // 
@@ -159,7 +159,7 @@ namespace LabManager
             this.button5.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button5.Size = new System.Drawing.Size(190, 39);
             this.button5.TabIndex = 9;
-            this.button5.Text = "文献管理Form";
+            this.button5.Text = "8:文献管理Form";
             this.button5.UseVisualStyleBackColor = false;
             this.button5.Click += new System.EventHandler(this.button5_Click_1);
             // 
@@ -174,7 +174,7 @@ namespace LabManager
             this.button6.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button6.Size = new System.Drawing.Size(190, 39);
             this.button6.TabIndex = 10;
-            this.button6.Text = "日直登録Form";
+            this.button6.Text = "9:日直登録Form";
             this.button6.UseVisualStyleBackColor = false;
             this.button6.Click += new System.EventHandler(this.button6_Click_1);
             // 
@@ -189,7 +189,7 @@ namespace LabManager
             this.button7.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button7.Size = new System.Drawing.Size(190, 39);
             this.button7.TabIndex = 11;
-            this.button7.Text = "大学カレンダー";
+            this.button7.Text = "10:CalendarEditor";
             this.button7.UseVisualStyleBackColor = false;
             this.button7.Click += new System.EventHandler(this.button7_Click_1);
             // 
@@ -204,7 +204,7 @@ namespace LabManager
             this.button8.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button8.Size = new System.Drawing.Size(190, 39);
             this.button8.TabIndex = 12;
-            this.button8.Text = "学生情報管理";
+            this.button8.Text = "11:学生情報管理";
             this.button8.UseVisualStyleBackColor = false;
             this.button8.Click += new System.EventHandler(this.button8_Click);
             // 
@@ -219,7 +219,7 @@ namespace LabManager
             this.button9.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button9.Size = new System.Drawing.Size(190, 39);
             this.button9.TabIndex = 13;
-            this.button9.Text = "カード管理";
+            this.button9.Text = "12:カード管理";
             this.button9.UseVisualStyleBackColor = false;
             this.button9.Click += new System.EventHandler(this.button9_Click);
             // 
@@ -234,7 +234,7 @@ namespace LabManager
             this.button10.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button10.Size = new System.Drawing.Size(190, 39);
             this.button10.TabIndex = 14;
-            this.button10.Text = "出席状況編集";
+            this.button10.Text = "13:出席状況編集";
             this.button10.UseVisualStyleBackColor = false;
             this.button10.Click += new System.EventHandler(this.button10_Click);
             //
@@ -439,7 +439,7 @@ namespace LabManager
             this.Controls.Add(this.label1);
             this.Controls.Add(this.flowLayoutPanel1);
             this.Name = "Form4";
-            this.Text = "統合管理システム用MenuForm";
+            this.Text = "4:統合管理システム用MenuForm";
             this.Load += new System.EventHandler(this.MenuForm_Load);
             this.flowLayoutPanel1.ResumeLayout(false);
             this.ResumeLayout(false);

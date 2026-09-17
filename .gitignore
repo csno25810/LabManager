@@ -7,3 +7,7 @@ obj/
 *.sln.docstates
 [Tt]humbs.db
 [Dd]esktop.ini
+
+# 一時スクリプト・抽出作業用（コミットしない）
+_lab_extract/
+_tmp_*.ps1

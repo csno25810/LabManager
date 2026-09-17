@@ -109,7 +109,9 @@ namespace LabManager
         private void LoadStudents()
         {
             var students = new DataTable();
-            Connector.TableReader("SELECT student_id, name FROM personal_info ORDER BY student_id", students);
+            Connector.TableReader(
+                $"SELECT student_id, name FROM personal_info WHERE {PersonalInfoHelper.SqlStudentsOnly} ORDER BY student_id",
+                students);
             comboBoxStudent.DataSource = students;
             comboBoxStudent.DisplayMember = "name";
             comboBoxStudent.ValueMember = "student_id";

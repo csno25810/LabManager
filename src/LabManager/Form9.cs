@@ -29,7 +29,7 @@ namespace LabManager
         /// </summary>
         private void LoadStudents()
         {
-            string query = "SELECT student_id, name FROM personal_info ORDER BY name";
+            string query = $"SELECT student_id, name FROM personal_info WHERE {PersonalInfoHelper.SqlStudentsOnly} ORDER BY name";
             DataTable students = new DataTable();
             Connector.TableReader(query, students);
 

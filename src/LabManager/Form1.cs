@@ -24,10 +24,15 @@ namespace LabManager
         int ClockMargin = 50;
         int SummaryBarHeight = 40;
         int DutyHeaderHeight = 28;
+        int TeacherSectionHeaderHeight = 24;
+        int studentGridHeight;
+        int teacherRowHeight;
         static readonly TimeSpan DutyDeadline = new TimeSpan(8, 50, 0);
 
         private Label lblOccupancy;
         private Label lblDutyHeader;
+        private Label lblTeacherHeader;
+        private DataGridView dataGridViewTeacher;
 
         // 設定ファイルをリードする
         public Setting mySqlSet = new Setting();
@@ -36,6 +41,7 @@ namespace LabManager
         string OnSeat = "在席";
         private System.Timers.Timer dailyTimer;
         private DateTime? lastPenaltyRunDate;
+        /// <summary>テレビ左半分の表示専用カレンダー (TvCalendarPanel / Form14)</summary>
         private Form14 tvLeftPanel;
 
         public Form1()
@@ -86,19 +92,57 @@ namespace LabManager
             int grid1Height = winHeight * 2 / 3 - SummaryBarHeight - DutyHeaderHeight;
             int grid2Top = winHeight * 2 / 3;
             int grid2Height = winHeight * 1 / 3 - btn1Size - ClockMargin;
+            teacherRowHeight = CalcAttendanceRowHeight(7);
+            int teacherBlockHeight = TeacherSectionHeaderHeight + teacherRowHeight + 2;
+            studentGridHeight = grid1Height - teacherBlockHeight;
 
             lblDutyHeader.Location = new Point(0, SummaryBarHeight + grid1Height);
             lblDutyHeader.Size = new Size(winWidth, DutyHeaderHeight);
 
+            lblTeacherHeader = new Label
+            {
+                Location = new Point(0, SummaryBarHeight + studentGridHeight),
+                Size = new Size(winWidth, TeacherSectionHeaderHeight),
+                Font = UiFonts.Get(10F, FontStyle.Bold),
+                ForeColor = Color.Black,
+                BackColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Text = "  【先生】"
+            };
+
+            dataGridViewTeacher = new DataGridView
+            {
+                Location = new Point(0, SummaryBarHeight + studentGridHeight + TeacherSectionHeaderHeight),
+                Size = new Size(winWidth, teacherRowHeight + 2),
+                RowHeadersVisible = false,
+                ColumnHeadersVisible = false,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeColumns = false,
+                AllowUserToResizeRows = false,
+                ReadOnly = true,
+                MultiSelect = false,
+                ScrollBars = ScrollBars.None,
+                Font = UiFonts.Get(15F),
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            dataGridViewTeacher.CellFormatting += AttendanceGrid_CellFormatting;
+
             // データ表示部分の初期設定
             dataGridView1.Location = new Point(0, SummaryBarHeight);
-            dataGridView1.Size = new Size(winWidth, grid1Height);
+            dataGridView1.Size = new Size(winWidth, studentGridHeight);
             dataGridView1.RowHeadersVisible = false;
             dataGridView1.ColumnHeadersVisible = true;
             dataGridView1.ColumnHeadersHeight = ColumnHeadHeight;
             dataGridView1.RowTemplate.Height = (winHeight - btn1Size) / 30;
             dataGridView1.Font = UiFonts.Get(15F);
             dataGridView1.ColumnHeadersDefaultCellStyle.Font = UiFonts.Get(10F);
+            dataGridView1.CellFormatting += AttendanceGrid_CellFormatting;
+
+            ConfigureAttendanceGrid(dataGridView1);
+            ConfigureAttendanceGrid(dataGridViewTeacher);
 
             dataGridView2.Location = new Point(0, grid2Top);
             dataGridView2.Size = new Size(winWidth, grid2Height);
@@ -145,8 +189,12 @@ namespace LabManager
 
             Controls.Add(lblOccupancy);
             Controls.Add(lblDutyHeader);
+            Controls.Add(lblTeacherHeader);
+            Controls.Add(dataGridViewTeacher);
             lblOccupancy.BringToFront();
             lblDutyHeader.BringToFront();
+            lblTeacherHeader.BringToFront();
+            dataGridViewTeacher.BringToFront();
 
             Shown += Form1_Shown;
         }
@@ -236,141 +284,227 @@ namespace LabManager
 
             timer1.Enabled = false;
             DataTable dataSql = new DataTable();
-            DataTable dataSqlCount = new DataTable();
             DateTime dt = DateTime.Now;
-
             string today = dt.ToString("yyyy-MM-dd");
-            Connector.TableReader("SELECT personal_info.student_id,name,MIN(date_format(time_stamp,'%H:%i')), MAX(date_format(time_stamp,'%H:%i')),COUNT(name) FROM((touch_log INNER JOIN chip_list ON touch_log.chip_id = chip_list.chip_id)INNER JOIN personal_info ON chip_list.student_id = personal_info.student_id) WHERE touch_log.time_stamp LIKE \"" + today + "%\"GROUP BY name", dataSql);
 
+            string attendanceQuery = $@"
+                SELECT
+                    pi.student_id,
+                    pi.name,
+                    COALESCE(MIN(DATE_FORMAT(tl.time_stamp, '%H:%i')), '-') AS first_touch,
+                    COALESCE(MAX(DATE_FORMAT(tl.time_stamp, '%H:%i')), '-') AS last_touch,
+                    COUNT(tl.chip_id) AS touch_count
+                FROM personal_info pi
+                LEFT JOIN chip_list cl ON pi.student_id = cl.student_id
+                LEFT JOIN touch_log tl ON cl.chip_id = tl.chip_id AND tl.time_stamp LIKE '{today}%'
+                WHERE {PersonalInfoHelper.SqlStudentsOnlyAliased}
+                GROUP BY pi.student_id, pi.name
+                ORDER BY pi.student_id";
+            Connector.TableReader(attendanceQuery, dataSql);
 
+            DataTable teacherSql = new DataTable();
+            string teacherQuery = $@"
+                SELECT
+                    pi.student_id,
+                    pi.name,
+                    COALESCE(MIN(DATE_FORMAT(tl.time_stamp, '%H:%i')), '-') AS first_touch,
+                    COALESCE(MAX(DATE_FORMAT(tl.time_stamp, '%H:%i')), '-') AS last_touch,
+                    COUNT(tl.chip_id) AS touch_count
+                FROM personal_info pi
+                LEFT JOIN chip_list cl ON pi.student_id = cl.student_id
+                LEFT JOIN touch_log tl ON cl.chip_id = tl.chip_id AND tl.time_stamp LIKE '{today}%'
+                WHERE pi.student_id = '{PersonalInfoHelper.TeacherStudentId}'
+                GROUP BY pi.student_id, pi.name";
+            Connector.TableReader(teacherQuery, teacherSql);
 
-
-            if (dataSql.Rows.Count == 0)
+            int rowHeight = CalcAttendanceRowHeight(dataSql.Rows.Count);
+            dataGridView1.RowTemplate.Height = rowHeight;
+            if (dataGridViewTeacher != null)
             {
-                dataGridView1.DataSource = null;
-                UpdateOccupancySummary(0, 0);
-                goto LoadDutySchedule;
+                dataGridViewTeacher.RowTemplate.Height = rowHeight;
+                dataGridViewTeacher.Height = rowHeight + 2;
             }
 
+            int presentCount = ApplyAttendanceState(dataSql, OnSeat, OffSeat);
+            int todayCount = CountTodayVisitors(dataSql);
+            int teacherPresent = ApplyAttendanceState(teacherSql, OnSeat, OffSeat);
+            int teacherToday = CountTodayVisitors(teacherSql);
+            presentCount += teacherPresent;
+            todayCount += teacherToday;
 
+            dataSql.Columns.Remove("touch_count");
+            if (teacherSql.Columns.Contains("touch_count"))
+                teacherSql.Columns.Remove("touch_count");
 
+            UpdateOccupancySummary(presentCount, todayCount);
 
+            dataGridView1.DataSource = dataSql;
+            BindAttendanceColumns(dataGridView1, showHeaders: true, teacherGrid: false);
+            dataGridViewTeacher.DataSource = teacherSql;
+            BindAttendanceColumns(dataGridViewTeacher, showHeaders: false, teacherGrid: true);
 
+            ApplyAttendanceGridColors(dataGridView1);
+            ApplyAttendanceGridColors(dataGridViewTeacher);
 
-            object[] Result = dataSql.Rows[0].ItemArray;
-
-            // カラム名の変更
-            dataSql.Columns[3].ColumnName = "AAA";
-            dataSql.Columns[2].ColumnName = "BBB";
-
-            // 描画領域の設定
-            int attendanceAreaHeight = winHeight - btn1Size - ColumnHeadHeight - ClockMargin - SummaryBarHeight - DutyHeaderHeight;
-            if (dataSql.Rows.Count < 15)
+            bool isDutyDay = LabCalendarStore.IsDutyDay(dt.Date);
+            if (isDutyDay)
             {
-                dataGridView1.RowTemplate.Height = attendanceAreaHeight / 15;
+                DataTable fetchedData = FetchData();
+                CheckAndUpdateDutyStatus(fetchedData);
+
+                string query = $@"
+                SELECT
+                    ds.student_id,
+                    pi.name,
+                    COALESCE(MIN(DATE_FORMAT(tl.time_stamp, '%H:%i')), '-') AS 'attendance_time',
+                    ds.duty_status,
+                    ds.duty_type,
+                    pi.penalty_count
+                FROM
+                    duty_schedule ds
+                INNER JOIN
+                    personal_info pi ON ds.student_id = pi.student_id
+                LEFT JOIN
+                    chip_list cl ON ds.student_id = cl.student_id
+                LEFT JOIN
+                    touch_log tl ON cl.chip_id = tl.chip_id AND DATE(tl.time_stamp) = '{today}'
+                WHERE
+                    ds.duty_date = '{today}'
+                GROUP BY
+                    ds.student_id, pi.name, ds.duty_status, ds.duty_type, pi.penalty_count";
+
+                DataTable dataDutySchedule = new DataTable();
+                Connector.TableReader(query, dataDutySchedule);
+                SetupDataGridView2(dataDutySchedule);
+                UpdateDutyHeader(dataDutySchedule, true);
             }
             else
             {
-                dataGridView1.RowTemplate.Height = attendanceAreaHeight / dataSql.Rows.Count;
+                dataGridView2.DataSource = null;
+                UpdateDutyHeader(null, false);
             }
 
-            DataTable newView = dataSql;
-            newView.Columns.Add("State", typeof(string));
-
-            int presentCount = 0;
-            for (int i = 0; i < dataSql.Rows.Count; i++)
-            {
-                if (int.Parse(dataSql.Rows[i]["COUNT(name)"].ToString()) % 2 == 0)
-                {
-                    newView.Rows[i]["State"] = OffSeat;
-                }
-                else
-                {
-                    newView.Rows[i]["State"] = OnSeat;
-                    presentCount++;
-                }
-            }
-            newView.Columns.Remove("COUNT(name)");
-            UpdateOccupancySummary(presentCount, dataSql.Rows.Count);
-
-            // 内容をバインドし表示する。
-            dataGridView1.DataSource = newView;
-
-            dataGridView1.Columns[0].HeaderText = "学籍番号";
-            dataGridView1.Columns[1].HeaderText = "氏名";
-            dataGridView1.Columns[2].HeaderText = "初回タッチ時刻";
-            dataGridView1.Columns[3].HeaderText = "最終タッチ時刻";
-            dataGridView1.Columns[4].HeaderText = "状態";
-
-            dataGridView1.Columns[0].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dataGridView1.Columns[1].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dataGridView1.Columns[2].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dataGridView1.Columns[3].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dataGridView1.Columns[3].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
-
-            dataGridView1.Columns[0].Width = 130;
-            dataGridView1.Columns[1].Width = winWidth - (130 + 150 + 150 + 100);
-            dataGridView1.Columns[2].Width = 150;
-            dataGridView1.Columns[3].Width = 150;
-            dataGridView1.Columns[4].Width = 100;
-
-            if (dataGridView1.CurrentCell != null)
-                dataGridView1.Rows[dataGridView1.CurrentCell.RowIndex].Selected = false;
-
-            //DataGridView1にバインドされているDataTableを取得
-            DataTable sorttable = (DataTable)dataGridView1.DataSource;
-            DataView dv = sorttable.DefaultView;
-            dv.Sort = "State DESC, AAA ASC";
-            dataGridView1.Columns[3].HeaderCell.SortGlyphDirection = SortOrder.Descending;
-            dataGridView1.Columns[4].HeaderCell.SortGlyphDirection = SortOrder.Descending;
-
-            if (dataGridView1.CurrentCell != null)
-                dataGridView1.Rows[dataGridView1.CurrentCell.RowIndex].Selected = false;
-
-            // 色換え
-            CellColorChange();
-
-            LoadDutySchedule:
-
-            DataTable fetchedData = FetchData();
-            CheckAndUpdateDutyStatus(fetchedData);
-
-            string query = $@"
-            SELECT 
-                ds.student_id, 
-                pi.name, 
-                COALESCE(MIN(DATE_FORMAT(tl.time_stamp, '%H:%i')), '-') AS 'attendance_time',
-                ds.duty_status,
-                ds.duty_type,
-                pi.penalty_count
-            FROM 
-                duty_schedule ds
-            INNER JOIN 
-                personal_info pi ON ds.student_id = pi.student_id
-            LEFT JOIN 
-                chip_list cl ON ds.student_id = cl.student_id
-            LEFT JOIN 
-                touch_log tl ON cl.chip_id = tl.chip_id AND DATE(tl.time_stamp) = '{today}'
-            WHERE 
-                ds.duty_date = '{today}'
-            GROUP BY 
-                ds.student_id, pi.name, ds.duty_status, ds.duty_type, pi.penalty_count
-            ";
-
-            // duty_schedule テーブルからのデータ取得
-            DataTable dataDutySchedule = new DataTable();
-            //Connector.TableReader($"SELECT student_id, duty_date, duty_status, penalty_count FROM duty_schedule WHERE duty_date = '{NowDay}'", dataDutySchedule);
-            //Connector.TableReader($"SELECT personal_info.student_id, name, MIN(DATE_FORMAT(touch_log.time_stamp, '%H:%i')) AS '出席時刻', duty_schedule.duty_status, duty_schedule.penalty_count FROM duty_schedule INNER JOIN chip_list ON duty_schedule.student_id = chip_list.student_id INNER JOIN personal_info ON chip_list.student_id = personal_info.student_id LEFT JOIN touch_log ON chip_list.chip_id = touch_log.chip_id WHERE duty_schedule.duty_date = '" + NowDay + "' GROUP BY name", dataDutySchedule);
-            Connector.TableReader(query, dataDutySchedule);
-
-            SetupDataGridView2(dataDutySchedule);
-            UpdateDutyHeader(dataDutySchedule);
             timer1.Enabled = true;
         }
 
-        private void UpdateDutyHeader(DataTable dutyData)
+        private static int ApplyAttendanceState(DataTable table, string onSeat, string offSeat)
         {
-            lblDutyHeader.Text = dutyData.Rows.Count == 0
+            if (!table.Columns.Contains("State"))
+                table.Columns.Add("State", typeof(string));
+
+            int presentCount = 0;
+            for (int i = 0; i < table.Rows.Count; i++)
+            {
+                int touchCount = Convert.ToInt32(table.Rows[i]["touch_count"]);
+                if (touchCount % 2 == 1)
+                {
+                    table.Rows[i]["State"] = onSeat;
+                    presentCount++;
+                }
+                else
+                {
+                    table.Rows[i]["State"] = offSeat;
+                }
+            }
+
+            return presentCount;
+        }
+
+        private static int CountTodayVisitors(DataTable table)
+        {
+            int count = 0;
+            for (int i = 0; i < table.Rows.Count; i++)
+            {
+                if (Convert.ToInt32(table.Rows[i]["touch_count"]) > 0)
+                    count++;
+            }
+
+            return count;
+        }
+
+        private int CalcAttendanceRowHeight(int studentCount)
+        {
+            int attendanceAreaHeight = winHeight - btn1Size - ColumnHeadHeight - ClockMargin
+                - SummaryBarHeight - DutyHeaderHeight;
+            if (studentCount < 15)
+                return Math.Max(40, attendanceAreaHeight / 15);
+            return Math.Max(40, attendanceAreaHeight / studentCount);
+        }
+
+        private void BindAttendanceColumns(DataGridView grid, bool showHeaders, bool teacherGrid)
+        {
+            if (grid.Columns.Count < 5)
+                return;
+
+            const int idWidth = 130;
+            const int touchWidth = 150;
+            const int stateWidth = 100;
+            const int fixedWithoutId = touchWidth + touchWidth + stateWidth;
+            const int fixedWithId = idWidth + fixedWithoutId;
+
+            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+            grid.ColumnHeadersVisible = showHeaders;
+
+            grid.Columns[0].HeaderText = "学籍番号";
+            grid.Columns[1].HeaderText = "氏名";
+            grid.Columns[2].HeaderText = "初回タッチ時刻";
+            grid.Columns[3].HeaderText = "最終タッチ時刻";
+            grid.Columns[4].HeaderText = "状態";
+
+            grid.Columns[0].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            grid.Columns[1].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            grid.Columns[2].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            grid.Columns[3].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            grid.Columns[4].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            grid.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            grid.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            grid.Columns[2].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            grid.Columns[3].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            grid.Columns[4].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+
+            grid.Columns[1].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            if (teacherGrid)
+            {
+                grid.Columns[0].Visible = false;
+                grid.Columns[1].Width = winWidth - fixedWithoutId;
+            }
+            else
+            {
+                grid.Columns[0].Visible = true;
+                grid.Columns[0].Width = idWidth;
+                grid.Columns[1].Width = winWidth - fixedWithId;
+            }
+
+            grid.Columns[2].Width = touchWidth;
+            grid.Columns[3].Width = touchWidth;
+            grid.Columns[4].Width = stateWidth;
+        }
+
+        private void AttendanceGrid_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                return;
+
+            var grid = (DataGridView)sender;
+            if (grid.Columns[e.ColumnIndex].Name != "student_id" && grid.Columns[e.ColumnIndex].Index != 0)
+                return;
+
+            string studentId = grid.Rows[e.RowIndex].Cells["student_id"]?.Value?.ToString();
+            if (PersonalInfoHelper.IsTeacher(studentId))
+                e.Value = "";
+        }
+
+        private void UpdateDutyHeader(DataTable dutyData, bool isDutyDay)
+        {
+            if (!isDutyDay)
+            {
+                lblDutyHeader.Text = "  本日の日直（本日は授業日ではありません）";
+                return;
+            }
+
+            lblDutyHeader.Text = dutyData == null || dutyData.Rows.Count == 0
                 ? "  本日の日直（担当なし）"
                 : $"  本日の日直（{dutyData.Rows.Count}名）";
         }
@@ -407,23 +541,68 @@ namespace LabManager
 
 
 
+        private void ConfigureAttendanceGrid(DataGridView grid)
+        {
+            grid.AlternatingRowsDefaultCellStyle.BackColor = Color.White;
+            grid.AlternatingRowsDefaultCellStyle.ForeColor = Color.Black;
+            grid.AlternatingRowsDefaultCellStyle.SelectionBackColor = Color.White;
+            grid.AlternatingRowsDefaultCellStyle.SelectionForeColor = Color.Black;
+            grid.DefaultCellStyle.SelectionBackColor = Color.White;
+            grid.DefaultCellStyle.SelectionForeColor = Color.Black;
+            grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            grid.DataBindingComplete += AttendanceGrid_DataBindingComplete;
+        }
+
+        private void AttendanceGrid_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
+        {
+            ApplyAttendanceGridColors((DataGridView)sender);
+        }
+
         private void CellColorChange()
         {
-            if (dataGridView1.RowCount == 0)
+            ApplyAttendanceGridColors(dataGridView1);
+        }
+
+        private void ApplyAttendanceGridColors(DataGridView grid)
+        {
+            if (grid == null || grid.RowCount == 0)
                 return;
 
-            if (dataGridView1.CurrentCell != null)
-                dataGridView1.Rows[dataGridView1.CurrentCell.RowIndex].Selected = false;
+            grid.ClearSelection();
+            grid.CurrentCell = null;
 
-            for (int i = 0; i < dataGridView1.RowCount; i++)
+            DataGridViewColumn stateColumn = grid.Columns["State"];
+            if (stateColumn == null)
+                return;
+
+            for (int i = 0; i < grid.RowCount; i++)
             {
-                var row = dataGridView1.Rows[i];
-                bool isPresent = dataGridView1[4, i].Value?.ToString() == OnSeat;
-                row.DefaultCellStyle.BackColor = Color.White;
-                row.DefaultCellStyle.ForeColor = Color.Black;
-                row.DefaultCellStyle.Font = UiFonts.Get(15F, isPresent ? FontStyle.Bold : FontStyle.Regular);
+                var row = grid.Rows[i];
+                bool isPresent = row.Cells[stateColumn.Index].Value?.ToString() == OnSeat;
+                Color backColor;
+                Color foreColor;
+                Font font;
+                if (isPresent)
+                {
+                    backColor = Color.White;
+                    foreColor = Color.Black;
+                    font = UiFonts.Get(15F, FontStyle.Bold);
+                }
+                else
+                {
+                    backColor = Color.FromArgb(225, 225, 225);
+                    foreColor = Color.FromArgb(110, 110, 110);
+                    font = UiFonts.Get(15F, FontStyle.Regular);
+                }
+
+                row.DefaultCellStyle.BackColor = backColor;
+                row.DefaultCellStyle.ForeColor = foreColor;
+                row.DefaultCellStyle.Font = font;
+                row.DefaultCellStyle.SelectionBackColor = backColor;
+                row.DefaultCellStyle.SelectionForeColor = foreColor;
             }
-            dataGridView1.Refresh();
+
+            grid.Invalidate();
         }
 
 
@@ -653,6 +832,9 @@ namespace LabManager
         }
         private void PerformDailyTask()
         {
+            if (!LabCalendarStore.IsDutyDay(DateTime.Now.Date))
+                return;
+
             DataTable fetchedData = FetchData();
             UpdatePenaltyCount(fetchedData);
         }

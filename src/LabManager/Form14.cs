@@ -2,26 +2,27 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
-using System.Linq;
 using System.Windows.Forms;
 
 namespace LabManager
 {
     /// <summary>
-    /// テレビPC左半分：表示専用カレンダー（当月）＋本日の予定。
-    /// 操作は不可。月移動・詳細確認は MENU の大学カレンダー（Form10）を使う。
+    /// TvCalendarPanel（Form14）— テレビPC左半分の表示専用カレンダー。
+    /// 編集は CalendarEditor (Form10) で行う。
     /// </summary>
     public partial class Form14 : Form
     {
-        private readonly CalendarSetting calendarSet = new CalendarSetting();
-        private string cachedIcsData;
+        private Dictionary<DateTime, LabCalendarDay> dayMap = new Dictionary<DateTime, LabCalendarDay>();
+        private Dictionary<DateTime, string> dutySurnames = new Dictionary<DateTime, string>();
         private DateTime displayedMonth = DateTime.Today;
         private int calendarAreaHeight;
         private int todayAreaHeight;
+        private Button btnRefresh;
 
         public Form14(Setting settings)
         {
             InitializeComponent();
+            Text = "TvCalendarPanel";
         }
 
         public void ConfigureForTvDisplay()
@@ -43,7 +44,17 @@ namespace LabManager
             lblMonth.Font = UiFonts.Get(14F, FontStyle.Bold);
             lblMonth.ForeColor = Color.Black;
             lblMonth.Location = new Point(0, 0);
-            lblMonth.Size = new Size(winWidth, monthBarHeight);
+            lblMonth.Size = new Size(winWidth - 80, monthBarHeight);
+            lblMonth.TextAlign = ContentAlignment.MiddleCenter;
+
+            btnRefresh = new Button
+            {
+                Text = "更新",
+                Location = new Point(winWidth - 72, 4),
+                Size = new Size(64, 28),
+                Font = UiFonts.Get(9F, FontStyle.Bold)
+            };
+            btnRefresh.Click += btnRefresh_Click;
 
             tableWeekdays.Location = new Point(0, monthBarHeight);
             tableWeekdays.Size = new Size(winWidth, weekdayBarHeight);
@@ -68,11 +79,17 @@ namespace LabManager
             listViewToday.Columns[0].Width = 72;
             listViewToday.Columns[1].Width = winWidth - 72 - 4;
 
+            Controls.Add(btnRefresh);
             Controls.Add(lblMonth);
             Controls.Add(tableWeekdays);
             Controls.Add(tableCalendar);
             Controls.Add(lblTodayHeader);
             Controls.Add(listViewToday);
+        }
+
+        private void btnRefresh_Click(object sender, EventArgs e)
+        {
+            RefreshAll();
         }
 
         private void BuildWeekdayHeader()
@@ -81,14 +98,26 @@ namespace LabManager
             string[] names = { "日", "月", "火", "水", "木", "金", "土" };
             for (int i = 0; i < 7; i++)
             {
+                Color foreColor = Color.Black;
+                Color backColor = Color.White;
+                if (i == 0)
+                {
+                    foreColor = Color.DarkRed;
+                    backColor = Color.FromArgb(255, 210, 210);
+                }
+                else if (i == 6)
+                {
+                    foreColor = Color.DarkBlue;
+                }
+
                 var lbl = new Label
                 {
                     Text = names[i],
                     Dock = DockStyle.Fill,
                     TextAlign = ContentAlignment.MiddleCenter,
                     Font = UiFonts.Get(10F, FontStyle.Bold),
-                    ForeColor = Color.Black,
-                    BackColor = Color.White,
+                    ForeColor = foreColor,
+                    BackColor = backColor,
                     BorderStyle = BorderStyle.FixedSingle
                 };
                 tableWeekdays.Controls.Add(lbl, i, 0);
@@ -97,14 +126,7 @@ namespace LabManager
 
         private void Form14_Load(object sender, EventArgs e)
         {
-            if (!calendarSet.ReadSetting())
-            {
-                lblMonth.Text = "カレンダー未設定";
-                lblTodayHeader.Text = "  本日の予定（設定なし）";
-                return;
-            }
-
-            timerRefresh.Interval = Math.Max(calendarSet.ReloadTime, 30) * 1000;
+            timerRefresh.Interval = 60 * 1000;
             timerRefresh.Enabled = true;
             RefreshAll();
         }
@@ -116,27 +138,18 @@ namespace LabManager
 
         private void RefreshAll()
         {
-            if (!calendarSet.ReadSetting())
-                return;
-
-            try
-            {
-                cachedIcsData = CalendarHelper.DownloadIcs(calendarSet);
-            }
-            catch
-            {
-                lblMonth.Text = DateTime.Today.ToString("yyyy年M月", CultureInfo.GetCultureInfo("ja-JP")) + "（取得失敗）";
-                lblTodayHeader.Text = "  本日の予定（取得失敗）";
-                listViewToday.Items.Clear();
-                return;
-            }
+            dayMap = LabCalendarStore.LoadDayMap(out _);
 
             DateTime today = DateTime.Today;
             if (displayedMonth.Year != today.Year || displayedMonth.Month != today.Month)
                 displayedMonth = today;
 
+            DateTime monthStart = new DateTime(displayedMonth.Year, displayedMonth.Month, 1);
+            DateTime monthEnd = monthStart.AddMonths(1).AddDays(-1);
+            dutySurnames = LabCalendarStore.LoadDutySurnames(monthStart, monthEnd);
+
             DisplayMonthCalendar(displayedMonth);
-            DisplayTodayEvents(today);
+            DisplayTodayInfo(today);
         }
 
         private void DisplayMonthCalendar(DateTime targetMonth)
@@ -145,7 +158,6 @@ namespace LabManager
             lblMonth.Text = targetMonth.ToString("yyyy年M月", CultureInfo.GetCultureInfo("ja-JP"));
 
             tableCalendar.Controls.Clear();
-            var classDays = CalendarHelper.GetEventDatesInMonth(cachedIcsData, targetMonth);
             DateTime today = DateTime.Today;
 
             DateTime firstDay = new DateTime(targetMonth.Year, targetMonth.Month, 1);
@@ -159,65 +171,40 @@ namespace LabManager
                 int row = cellPosition / 7;
                 int col = cellPosition % 7;
 
-                bool isToday = date.Date == today;
-                bool isClassDay = classDays.Contains(date.Date);
+                LabCalendarDay dayInfo = LabCalendarStore.GetDay(dayMap, date);
+                dutySurnames.TryGetValue(date.Date, out string dutySurname);
 
-                var cell = new Panel
-                {
-                    BorderStyle = BorderStyle.FixedSingle,
-                    BackColor = Color.White
-                };
-
-                if (isToday)
-                    cell.BackColor = Color.FromArgb(240, 240, 240);
-
-                var label = new Label
-                {
-                    Text = day.ToString(),
-                    Dock = DockStyle.Top,
-                    TextAlign = ContentAlignment.TopLeft,
-                    Font = UiFonts.Get(11F, isToday ? FontStyle.Bold : FontStyle.Regular),
-                    ForeColor = Color.Black,
-                    Padding = new Padding(2, 2, 0, 0)
-                };
-                cell.Controls.Add(label);
-
-                if (isClassDay)
-                {
-                    var mark = new Label
-                    {
-                        Text = "授業",
-                        Dock = DockStyle.Bottom,
-                        TextAlign = ContentAlignment.BottomCenter,
-                        Font = UiFonts.Get(9F),
-                        ForeColor = Color.Black
-                    };
-                    cell.Controls.Add(mark);
-                }
-
+                var cell = new Panel { BorderStyle = BorderStyle.FixedSingle };
+                LabCalendarStore.BuildCalendarCell(
+                    cell, date, dayInfo, date.Date == today, false, dutySurname);
                 tableCalendar.Controls.Add(cell, col, row);
             }
         }
 
-        private void DisplayTodayEvents(DateTime today)
+        private void DisplayTodayInfo(DateTime today)
         {
-            lblTodayHeader.Text = "  本日の予定（" + today.ToString("yyyy/MM/dd(ddd)", CultureInfo.GetCultureInfo("ja-JP")) + "）";
+            LabCalendarDay dayInfo = LabCalendarStore.GetDay(dayMap, today);
+            string header = "  本日（" + today.ToString("yyyy/MM/dd(ddd)", CultureInfo.GetCultureInfo("ja-JP")) + "）";
+            if (dayInfo.IsClassDay)
+                header += "  " + dayInfo.SessionSymbol;
+            lblTodayHeader.Text = header;
 
             listViewToday.Items.Clear();
-            var events = CalendarHelper.GetEventsOnDate(cachedIcsData, today);
-
-            if (events.Count == 0)
+            if (dutySurnames.TryGetValue(today.Date, out string duty) && !string.IsNullOrWhiteSpace(duty))
+            {
+                listViewToday.Items.Add(new ListViewItem(new[] { "日直", duty }));
+            }
+            if (!string.IsNullOrWhiteSpace(dayInfo.Memo))
+            {
+                listViewToday.Items.Add(new ListViewItem(new[] { "予定", dayInfo.Memo }));
+            }
+            else if (dayInfo.IsClassDay)
+            {
+                listViewToday.Items.Add(new ListViewItem(new[] { "授業", dayInfo.SessionSymbol }));
+            }
+            else if (listViewToday.Items.Count == 0)
             {
                 listViewToday.Items.Add(new ListViewItem(new[] { "-", "予定なし" }));
-                return;
-            }
-
-            foreach (var evt in events)
-            {
-                string timeText = evt.Start.TimeOfDay.TotalMinutes > 0
-                    ? evt.Start.ToString("HH:mm")
-                    : "終日";
-                listViewToday.Items.Add(new ListViewItem(new[] { timeText, evt.Summary }));
             }
         }
     }

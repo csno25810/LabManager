@@ -156,7 +156,12 @@
     <Compile Include="Form14.Designer.cs">
       <DependentUpon>Form14.cs</DependentUpon>
     </Compile>
-    <Compile Include="CalendarHelper.cs" />
+    <Compile Include="LabCalendarStore.cs" />
+    <Compile Include="DutyWeekdayRosterStore.cs" />
+    <Compile Include="PersonalInfoHelper.cs" />
+    <Compile Include="Form5.WeekdayRoster.cs">
+      <DependentUpon>Form5.cs</DependentUpon>
+    </Compile>
     <Compile Include="Form2.cs">
       <SubType>Form</SubType>
     </Compile>

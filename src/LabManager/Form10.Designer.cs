@@ -86,7 +86,7 @@ namespace LabManager
             this.Controls.Add(this.btnPrevMonth);        // 前月ボタン
             this.Controls.Add(this.btnNextMonth);        // 次月ボタン
             this.Name = "Form10";
-            this.Text = "大学カレンダー";
+            this.Text = "CalendarEditor";
             this.Load += new System.EventHandler(this.Form10_Load); // フォームロード時イベント
             this.ResumeLayout(false);
         }

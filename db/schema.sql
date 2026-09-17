@@ -88,6 +88,22 @@ CREATE TABLE IF NOT EXISTS references_list (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 曜日別日直担当（最大2名/曜日）
+CREATE TABLE IF NOT EXISTS duty_weekday_roster (
+    weekday    TINYINT      NOT NULL COMMENT '1=月 … 5=金',
+    slot       TINYINT      NOT NULL COMMENT '1 or 2',
+    student_id VARCHAR(20)  NOT NULL DEFAULT '',
+    PRIMARY KEY (weekday, slot)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- 研究室カレンダー（授業日・予定メモ）
+CREATE TABLE IF NOT EXISTS lab_calendar_day (
+    calendar_date DATE         NOT NULL,
+    is_class_day  TINYINT(1)   NOT NULL DEFAULT 0,
+    memo          VARCHAR(12)  NOT NULL DEFAULT '',
+    PRIMARY KEY (calendar_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- アプリ用の専用ユーザー作成
 -- 古い MySql.Data 5.0.9 と互換を取るため mysql_native_password を使用
 CREATE USER IF NOT EXISTS 'labapp'@'localhost'

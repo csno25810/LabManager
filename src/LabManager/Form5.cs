@@ -93,17 +93,19 @@ namespace LabManager
             this.Size = new Size(winWidth, winHeight);
             this.StartPosition = FormStartPosition.Manual;
             this.Location = new Point(winWidth / 9, winHeight / 9);
+            this.Text = "5:日直管理システム";
+            this.MinimumSize = new Size(900, 620);
 
-            dataGridView2.Size = new Size(winWidth / 2, winHeight);
+            int gridWidth = Math.Max(320, winWidth / 2);
+            dataGridView2.Dock = DockStyle.None;
+            dataGridView2.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right;
+            dataGridView2.Location = new Point(winWidth - gridWidth, 0);
+            dataGridView2.Size = new Size(gridWidth, winHeight - 50);
 
-            panel1.Size = new Size(winWidth * 4 / 10, winHeight - 200);
-            panel1.Location = new Point(0, 0);
-
-            panel2.Size = new Size(winWidth * 4 / 10, winHeight - 200);
-            panel2.Location = new Point(0, 0);
-
-            panel5.Size = new Size(winWidth * 4 / 10, winHeight - 200);
-            panel5.Location = new Point(0, 0);
+            int leftWidth = winWidth - gridWidth;
+            panel1.SetBounds(0, 0, leftWidth, winHeight - 50);
+            panel2.SetBounds(0, 0, leftWidth, winHeight - 50);
+            panel5.SetBounds(0, 0, leftWidth, winHeight - 50);
 
             // 初期表示：曜日別(panel2)
             panel1.Visible = false;
@@ -119,6 +121,8 @@ namespace LabManager
                 }
             }
             catch { }
+
+            BuildWeekdayRosterUi();
         }
 
         // Form5 ロード
@@ -131,6 +135,8 @@ namespace LabManager
             dataGridView2.RowHeadersVisible = false;
             dataGridView2.AllowUserToAddRows = false;
             dataGridView2.ReadOnly = true;
+
+            InitWeekdayRosterPanel();
         }
 
         // Googleフォーム読込（右のDataGridViewに全行表示）
@@ -510,11 +516,7 @@ namespace LabManager
 
         private bool TryInsertDutyScheduleIfMissing(string studentId, DateTime dutyDate)
         {
-            if (DutyScheduleExists(studentId, dutyDate))
-                return false;
-
-            InsertDutySchedule(studentId, dutyDate);
-            return true;
+            return DutyScheduleStore.TryInsertIfMissing(studentId, dutyDate, out _);
         }
 
         private void InsertDutySchedulePunishment(string studentId, DateTime dutyDate)
@@ -676,6 +678,29 @@ namespace LabManager
             }
         }
 
+        private bool TryLoadLabCalendar(out Dictionary<DateTime, LabCalendarDay> dayMap)
+        {
+            dayMap = LabCalendarStore.LoadDayMap(out _);
+            if (Connector.IsConnected)
+                return true;
+
+            DialogResult result = MessageBox.Show(
+                "データベース未接続のため授業日を参照できません。\n全平日を対象に登録しますか？",
+                "日直登録",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+            dayMap = null;
+            return result == DialogResult.Yes;
+        }
+
+        private static bool ShouldRegisterOnDate(Dictionary<DateTime, LabCalendarDay> dayMap, DateTime date)
+        {
+            if (dayMap == null)
+                return date.DayOfWeek >= DayOfWeek.Monday && date.DayOfWeek <= DayOfWeek.Friday;
+
+            return LabCalendarStore.IsDutyEligibleClassDay(dayMap, date);
+        }
+
         // panel2：曜日別登録（Googleフォームの登校可否を考慮）
         private void button7_Click(object sender, EventArgs e)
         {
@@ -688,18 +713,16 @@ namespace LabManager
                 return;
             }
 
-            var weekdayStudents = new Dictionary<DayOfWeek, List<string>>
+            var weekdayStudents = DutyWeekdayRosterStore.LoadRoster(out string rosterError);
+            if (!string.IsNullOrWhiteSpace(rosterError))
             {
-                { DayOfWeek.Monday, ParseStudentIds(textBoxM.Text) },
-                { DayOfWeek.Tuesday, ParseStudentIds(textBoxT.Text) },
-                { DayOfWeek.Wednesday, ParseStudentIds(textBoxW.Text) },
-                { DayOfWeek.Thursday, ParseStudentIds(textBoxTh.Text) },
-                { DayOfWeek.Friday, ParseStudentIds(textBoxF.Text) },
-            };
+                MessageBox.Show(rosterError, "日直登録");
+                return;
+            }
 
             if (weekdayStudents.Values.All(ids => ids.Count == 0))
             {
-                MessageBox.Show("曜日ごとの学生番号を入力してください。", "日直登録");
+                MessageBox.Show("曜日担当が未設定です。\n担当者を選択して「担当を保存」してください。", "日直登録");
                 return;
             }
 
@@ -731,13 +754,23 @@ namespace LabManager
                 }
             }
 
+            if (!TryLoadLabCalendar(out Dictionary<DateTime, LabCalendarDay> dayMap))
+                return;
+
             int registered = 0;
             int skipped = 0;
+            int skippedNonClassDay = 0;
 
             for (DateTime date = startDate; date <= endDate; date = date.AddDays(1))
             {
                 if (!weekdayStudents.TryGetValue(date.DayOfWeek, out List<string> studentIds))
                     continue;
+
+                if (!ShouldRegisterOnDate(dayMap, date))
+                {
+                    skippedNonClassDay++;
+                    continue;
+                }
 
                 foreach (string studentId in studentIds)
                 {
@@ -757,6 +790,8 @@ namespace LabManager
             }
 
             string message = $"日直を {registered} 件登録しました。";
+            if (skippedNonClassDay > 0)
+                message += $"\n授業日以外の {skippedNonClassDay} 日はスキップしました。";
             if (skipped > 0)
                 message += $"\nGoogleフォームの登校不可により {skipped} 件スキップしました。";
 
@@ -839,16 +874,34 @@ namespace LabManager
             int dailyCount = int.Parse(comboBox1.SelectedItem.ToString());
             List<string> studentIds = listBoxStudentNumbers.Items.Cast<string>().ToList();
 
+            if (!TryLoadLabCalendar(out Dictionary<DateTime, LabCalendarDay> dayMap))
+                return;
+
             int studentIndex = 0;
 
-            // 対象日生成
+            // 対象日生成（選択曜日かつ授業日のみ。土曜は日直対象外）
             List<DateTime> validDates = new List<DateTime>();
+            int skippedNonClassDay = 0;
             for (DateTime d = startDate; d <= endDate; d = d.AddDays(1))
             {
-                if (selectedDays.Contains(d.DayOfWeek))
+                if (!selectedDays.Contains(d.DayOfWeek))
+                    continue;
+
+                if (!ShouldRegisterOnDate(dayMap, d))
                 {
-                    validDates.Add(d);
+                    skippedNonClassDay++;
+                    continue;
                 }
+
+                validDates.Add(d);
+            }
+
+            if (validDates.Count == 0)
+            {
+                MessageBox.Show(
+                    "指定期間に日直対象の授業日がありません。\nForm10 研究室カレンダーで授業日を設定してください。",
+                    "日直登録");
+                return;
             }
 
 
@@ -962,7 +1015,11 @@ namespace LabManager
                 }
             }*/
 
-            MessageBox.Show("Googleフォームの可否を考慮して自動割り振りを行いました。");
+            string doneMessage = "Googleフォームの可否を考慮して自動割り振りを行いました。";
+            if (skippedNonClassDay > 0)
+                doneMessage += $"\n授業日以外の {skippedNonClassDay} 日はスキップしました。";
+
+            MessageBox.Show(doneMessage, "日直登録");
             listBoxStudentNumbers.Items.Clear();
         }
 
