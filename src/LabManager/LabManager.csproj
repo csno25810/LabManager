@@ -165,6 +165,10 @@
     <Compile Include="LabCalendarStore.cs" />
     <Compile Include="DutyWeekdayRosterStore.cs" />
     <Compile Include="PersonalInfoHelper.cs" />
+    <Compile Include="LabUserStore.cs" />
+    <Compile Include="..\Shared\PasswordHash.cs">
+      <Link>PasswordHash.cs</Link>
+    </Compile>
     <Compile Include="Form5.WeekdayRoster.cs">
       <DependentUpon>Form5.cs</DependentUpon>
     </Compile>

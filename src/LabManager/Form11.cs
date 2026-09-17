@@ -1,5 +1,6 @@
 using System;
 using System.Data;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace LabManager
@@ -14,6 +15,7 @@ namespace LabManager
             InitializeComponent();
             mySqlSet = settings;
             comboBoxSearchField.SelectedIndex = 0;
+            SetupEditUi();
         }
 
         private bool EnsureConnected()
@@ -53,7 +55,7 @@ namespace LabManager
                 return;
             }
 
-            string name = familyName + " " + givenName;
+            string name = PersonalInfoHelper.JoinDisplayName(familyName, givenName);
 
             if (string.IsNullOrWhiteSpace(mail))
             {
@@ -83,8 +85,21 @@ namespace LabManager
                 INSERT INTO personal_info (student_id, name, mail, penalty_count)
                 VALUES ('{EscapeSql(studentId)}', '{EscapeSql(name)}', '{EscapeSql(mail)}', 0)";
             Connector.ExecuteCommand(commandText);
-
-            MessageBox.Show("登録しました。", "学生情報の追加");
+            string portalError;
+            if (!LabUserStore.TryCreateForStudent(studentId, out portalError))
+            {
+                MessageBox.Show(
+                    "学生情報は登録しましたが、LabPortal ログインの作成に失敗しました。\n" +
+                    (portalError ?? "") +
+                    "\nLabPortal を再起動すると自動で作られることがあります。",
+                    "学生情報の追加");
+            }
+            else
+            {
+                MessageBox.Show(
+                    "登録しました。\nLabPortal の初期パスワードは " + LabCommon.PasswordHash.DefaultPassword + " です。",
+                    "学生情報の追加");
+            }
             textBoxStudentId.Clear();
             textBoxName.Clear();
             textBoxGivenName.Clear();
@@ -105,7 +120,7 @@ namespace LabManager
             string keyword = textBoxSearchValue.Text.Trim();
             if (string.IsNullOrWhiteSpace(keyword))
             {
-                MessageBox.Show("検索キーワードを入力してください。", "学生情報の削除");
+                MessageBox.Show("検索キーワードを入力してください。", "学生情報の検索");
                 return;
             }
 
@@ -122,7 +137,7 @@ namespace LabManager
             dataGridViewStudents.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells;
 
             if (searchResultTable.Rows.Count == 0)
-                MessageBox.Show("学生情報が見つかりませんでした。", "学生情報の削除");
+                MessageBox.Show("学生情報が見つかりませんでした。", "学生情報の検索");
         }
 
         private string GetSearchColumnName()
@@ -162,9 +177,105 @@ namespace LabManager
             if (!EnsureConnected())
                 return;
 
+            LabUserStore.DeleteForStudent(studentId);
             Connector.ExecuteCommand($"DELETE FROM personal_info WHERE student_id = '{EscapeSql(studentId)}'");
             MessageBox.Show("消去しました。", "学生情報の削除");
             buttonSearch_Click(sender, e);
+        }
+
+        private TextBox textBoxEditId;
+        private TextBox textBoxEditFamily;
+        private TextBox textBoxEditGiven;
+        private TextBox textBoxEditMail;
+        private Button buttonSave;
+
+        private void SetupEditUi()
+        {
+            tabPageDelete.Text = "検索・編集・削除";
+            labelDeleteTitle.Text = "検索・編集・削除";
+            ClientSize = new Size(584, 470);
+            dataGridViewStudents.Height = 118;
+            buttonDelete.Location = new Point(463, 400);
+
+            var labelId = new Label { Text = "学籍番号", Location = new Point(20, 220), AutoSize = true };
+            textBoxEditId = new TextBox { Location = new Point(120, 217), Size = new Size(120, 19), ReadOnly = true };
+            var labelFamily = new Label { Text = "苗字", Location = new Point(20, 250), AutoSize = true };
+            textBoxEditFamily = new TextBox { Location = new Point(120, 247), Size = new Size(180, 19) };
+            var labelGiven = new Label { Text = "名前", Location = new Point(320, 250), AutoSize = true };
+            textBoxEditGiven = new TextBox { Location = new Point(360, 247), Size = new Size(180, 19) };
+            var labelMailEdit = new Label { Text = "メール", Location = new Point(20, 280), AutoSize = true };
+            textBoxEditMail = new TextBox { Location = new Point(120, 277), Size = new Size(418, 19) };
+            buttonSave = new Button { Text = "保存", Location = new Point(370, 400), Size = new Size(75, 23) };
+            buttonSave.Click += buttonSave_Click;
+
+            tabPageDelete.Controls.Add(labelId);
+            tabPageDelete.Controls.Add(textBoxEditId);
+            tabPageDelete.Controls.Add(labelFamily);
+            tabPageDelete.Controls.Add(textBoxEditFamily);
+            tabPageDelete.Controls.Add(labelGiven);
+            tabPageDelete.Controls.Add(textBoxEditGiven);
+            tabPageDelete.Controls.Add(labelMailEdit);
+            tabPageDelete.Controls.Add(textBoxEditMail);
+            tabPageDelete.Controls.Add(buttonSave);
+
+            dataGridViewStudents.SelectionChanged += dataGridViewStudents_SelectionChanged;
+        }
+
+        private void dataGridViewStudents_SelectionChanged(object sender, EventArgs e)
+        {
+            if (dataGridViewStudents.CurrentRow == null)
+                return;
+
+            textBoxEditId.Text = dataGridViewStudents.CurrentRow.Cells["学籍番号"].Value?.ToString() ?? "";
+            string fullName = dataGridViewStudents.CurrentRow.Cells["氏名"].Value?.ToString() ?? "";
+            string family;
+            string given;
+            PersonalInfoHelper.SplitDisplayName(fullName, out family, out given);
+            textBoxEditFamily.Text = family;
+            textBoxEditGiven.Text = given;
+            textBoxEditMail.Text = dataGridViewStudents.CurrentRow.Cells["メール"].Value?.ToString() ?? "";
+        }
+
+        private void buttonSave_Click(object sender, EventArgs e)
+        {
+            string studentId = textBoxEditId.Text.Trim();
+            string familyName = textBoxEditFamily.Text.Trim();
+            string givenName = textBoxEditGiven.Text.Trim();
+            string mail = textBoxEditMail.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(studentId))
+            {
+                MessageBox.Show("一覧から学生を選択してください。", "学生情報の編集");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(familyName))
+            {
+                MessageBox.Show("苗字を入力してください。", "学生情報の編集");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(givenName))
+            {
+                MessageBox.Show("名前を入力してください。", "学生情報の編集");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(mail))
+            {
+                MessageBox.Show("メールアドレスを入力してください。", "学生情報の編集");
+                return;
+            }
+
+            if (!EnsureConnected())
+                return;
+
+            string name = PersonalInfoHelper.JoinDisplayName(familyName, givenName);
+            Connector.ExecuteCommand(
+                $"UPDATE personal_info SET name = '{EscapeSql(name)}', mail = '{EscapeSql(mail)}' WHERE student_id = '{EscapeSql(studentId)}'");
+            MessageBox.Show("保存しました。", "学生情報の編集");
+            if (!string.IsNullOrWhiteSpace(textBoxSearchValue.Text))
+                buttonSearch_Click(sender, e);
         }
 
         private static string EscapeSql(string value)

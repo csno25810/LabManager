@@ -32,7 +32,6 @@ namespace LabPortal
 
     public sealed class PortalService
     {
-        public const string DefaultPassword = "lab2026";
         public const string CookieName = "labportal_session";
         private const int SessionHours = 12;
 
@@ -89,51 +88,57 @@ namespace LabPortal
                     cmd.ExecuteNonQuery();
                 }
 
-                int userCount;
-                using (var countCmd = new MySqlCommand("SELECT COUNT(*) FROM lab_user", conn))
-                    userCount = Convert.ToInt32(countCmd.ExecuteScalar());
+                int inserted = EnsureMissingUsers(conn);
+                if (inserted > 0)
+                    Console.WriteLine("lab_user を追加しました（" + inserted + "件）。初期パスワードは " +
+                                      LabCommon.PasswordHash.DefaultPassword + " です。");
+            }
+        }
 
-                if (userCount > 0)
-                    return;
+        private static int EnsureMissingUsers(MySqlConnection conn)
+        {
+            var people = new DataTable();
+            using (var adapter = new MySqlDataAdapter(
+                "SELECT student_id FROM personal_info ORDER BY student_id", conn))
+            {
+                adapter.Fill(people);
+            }
 
-                var people = new DataTable();
-                using (var adapter = new MySqlDataAdapter(
-                    "SELECT student_id, name FROM personal_info ORDER BY student_id", conn))
+            int inserted = 0;
+            foreach (DataRow row in people.Rows)
+            {
+                string studentId = Convert.ToString(row["student_id"]) ?? "";
+                if (string.IsNullOrEmpty(studentId))
+                    continue;
+                if (TryInsertUser(conn, studentId))
+                    inserted++;
+            }
+
+            return inserted;
+        }
+
+        private static bool TryInsertUser(MySqlConnection conn, string studentId)
+        {
+            bool teacher = IsTeacher(studentId);
+            string loginId = teacher ? "teacher" : studentId;
+            string role = teacher ? "teacher" : "student";
+            using (var insert = new MySqlCommand(
+                "INSERT INTO lab_user (login_id, student_id, password_hash, role) VALUES (@login, @sid, @hash, @role)",
+                conn))
+            {
+                insert.Parameters.AddWithValue("@login", loginId);
+                insert.Parameters.AddWithValue("@sid", studentId);
+                insert.Parameters.AddWithValue("@hash", LabCommon.PasswordHash.Hash(LabCommon.PasswordHash.DefaultPassword));
+                insert.Parameters.AddWithValue("@role", role);
+                try
                 {
-                    adapter.Fill(people);
+                    insert.ExecuteNonQuery();
+                    return true;
                 }
-
-                int inserted = 0;
-                foreach (DataRow row in people.Rows)
+                catch (MySqlException)
                 {
-                    string studentId = Convert.ToString(row["student_id"]) ?? "";
-                    if (string.IsNullOrEmpty(studentId))
-                        continue;
-
-                    bool teacher = IsTeacher(studentId);
-                    string loginId = teacher ? "teacher" : studentId;
-                    string role = teacher ? "teacher" : "student";
-                    using (var insert = new MySqlCommand(
-                        "INSERT INTO lab_user (login_id, student_id, password_hash, role) VALUES (@login, @sid, @hash, @role)",
-                        conn))
-                    {
-                        insert.Parameters.AddWithValue("@login", loginId);
-                        insert.Parameters.AddWithValue("@sid", studentId);
-                        insert.Parameters.AddWithValue("@hash", HashPassword(DefaultPassword));
-                        insert.Parameters.AddWithValue("@role", role);
-                        try
-                        {
-                            insert.ExecuteNonQuery();
-                            inserted++;
-                        }
-                        catch (MySqlException)
-                        {
-                            // 既にあればスキップ
-                        }
-                    }
+                    return false;
                 }
-
-                Console.WriteLine("lab_user を初期化しました（" + inserted + "件）。初期パスワードは " + DefaultPassword + " です。");
             }
         }
 
@@ -146,6 +151,9 @@ namespace LabPortal
             string password = request.FormValue("password") ?? "";
             if (loginId.Length == 0 || password.Length == 0)
                 return HttpResponse.Html(LoginPage("ログインIDとパスワードを入力してください。"));
+
+            using (var conn = Open())
+                EnsureMissingUsers(conn);
 
             PortalSession session;
             if (!TryLogin(loginId, password, out session))
@@ -264,7 +272,7 @@ namespace LabPortal
                         return false;
 
                     string hash = Convert.ToString(reader["password_hash"]) ?? "";
-                    if (!VerifyPassword(password, hash))
+                    if (!LabCommon.PasswordHash.Verify(password, hash))
                         return false;
 
                     session = new PortalSession
@@ -394,6 +402,13 @@ namespace LabPortal
             public string Type { get; set; }
         }
 
+        private sealed class DiaryEntry
+        {
+            public string Date { get; set; }
+            public string Title { get; set; }
+            public string Content { get; set; }
+        }
+
         private sealed class MyHistory
         {
             public int VisitDays { get; set; }
@@ -403,6 +418,7 @@ namespace LabPortal
             public List<DayVisit> Days { get; set; }
             public List<TouchEvent> Touches { get; set; }
             public List<DutyEvent> Duties { get; set; }
+            public List<DiaryEntry> Diaries { get; set; }
         }
 
         private MyHistory LoadMyHistory(string studentId)
@@ -414,7 +430,8 @@ namespace LabPortal
                 TodayLast = "-",
                 Days = new List<DayVisit>(),
                 Touches = new List<TouchEvent>(),
-                Duties = new List<DutyEvent>()
+                Duties = new List<DutyEvent>(),
+                Diaries = new List<DiaryEntry>()
             };
 
             DateTime from = DateTime.Today.AddDays(-30);
@@ -513,6 +530,40 @@ namespace LabPortal
                         }
                     }
                 }
+
+                try
+                {
+                    using (var cmd = new MySqlCommand(@"
+                        SELECT
+                            DATE_FORMAT(d.dialy_date, '%Y-%m-%d') AS diary_date,
+                            d.title,
+                            d.content
+                        FROM diary_log d
+                        WHERE d.student_id = @sid
+                          AND d.dialy_date >= @from
+                        ORDER BY d.dialy_date DESC
+                        LIMIT 20", conn))
+                    {
+                        cmd.Parameters.AddWithValue("@sid", studentId);
+                        cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                history.Diaries.Add(new DiaryEntry
+                                {
+                                    Date = Convert.ToString(reader["diary_date"]),
+                                    Title = Convert.ToString(reader["title"]),
+                                    Content = Convert.ToString(reader["content"])
+                                });
+                            }
+                        }
+                    }
+                }
+                catch (MySqlException)
+                {
+                    // diary_log が無い環境では空のまま
+                }
             }
 
             return history;
@@ -545,7 +596,7 @@ namespace LabPortal
                 "<button type=\"submit\">ログイン</button>" +
                 "</form>" +
                 "<p class=\"hint\">学生は学籍番号、先生は teacher。<br>初回のパスワードは " +
-                HttpUtility.HtmlEncode(DefaultPassword) + " です。</p>");
+                HttpUtility.HtmlEncode(LabCommon.PasswordHash.DefaultPassword) + " です。</p>");
         }
 
         private string AttendancePage(PortalSession session, List<AttendanceRow> rows, int present, int visitors)
@@ -624,6 +675,25 @@ namespace LabPortal
                 sb.Append("</tbody></table>");
             }
 
+            sb.Append("<h2>日誌（直近30日）</h2>");
+            if (history.Diaries.Count == 0)
+            {
+                sb.Append("<p class=\"muted\">この期間の日誌はありません。</p>");
+            }
+            else
+            {
+                foreach (DiaryEntry diary in history.Diaries)
+                {
+                    sb.Append("<article class=\"diary\"><h3>")
+                        .Append(HttpUtility.HtmlEncode(diary.Date))
+                        .Append("　")
+                        .Append(HttpUtility.HtmlEncode(diary.Title))
+                        .Append("</h3><p>")
+                        .Append(HttpUtility.HtmlEncode(diary.Content ?? ""))
+                        .Append("</p></article>");
+                }
+            }
+
             sb.Append("<h2>タッチ履歴（直近30日・最大80件）</h2>");
             if (history.Touches.Count == 0)
             {
@@ -677,7 +747,7 @@ namespace LabPortal
                 object value = cmd.ExecuteScalar();
                 if (value == null || value == DBNull.Value)
                     return false;
-                return VerifyPassword(password, Convert.ToString(value));
+                return LabCommon.PasswordHash.Verify(password, Convert.ToString(value));
             }
         }
 
@@ -687,7 +757,7 @@ namespace LabPortal
             using (var cmd = new MySqlCommand(
                 "UPDATE lab_user SET password_hash = @hash WHERE login_id = @login", conn))
             {
-                cmd.Parameters.AddWithValue("@hash", HashPassword(newPassword));
+                cmd.Parameters.AddWithValue("@hash", LabCommon.PasswordHash.Hash(newPassword));
                 cmd.Parameters.AddWithValue("@login", loginId);
                 return cmd.ExecuteNonQuery() == 1;
             }
@@ -730,6 +800,9 @@ namespace LabPortal
                    "nav{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #ccc;}" +
                    "nav a.current{font-weight:bold;}" +
                    "h2{font-size:1.1rem;margin:20px 0 8px;}" +
+                   "article.diary{background:#fff;border:1px solid #ccc;padding:10px;margin-bottom:8px;}" +
+                   "article.diary h3{font-size:1rem;margin:0 0 8px;}" +
+                   "article.diary p{margin:0;white-space:pre-wrap;text-align:left;}" +
                    ".kpi{background:#fff;border:1px solid #111;padding:12px;font-weight:bold;text-align:center;}" +
                    "table{width:100%;border-collapse:collapse;background:#fff;}" +
                    "th,td{border:1px solid #ccc;padding:8px;text-align:center;}" +
@@ -752,58 +825,6 @@ namespace LabPortal
             using (var rng = RandomNumberGenerator.Create())
                 rng.GetBytes(bytes);
             return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
-        }
-
-        private static string HashPassword(string password)
-        {
-            byte[] salt = new byte[16];
-            using (var rng = RandomNumberGenerator.Create())
-                rng.GetBytes(salt);
-            using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 10000))
-            {
-                byte[] hash = pbkdf2.GetBytes(32);
-                return "pbkdf2$10000$" + Convert.ToBase64String(salt) + "$" + Convert.ToBase64String(hash);
-            }
-        }
-
-        private static bool VerifyPassword(string password, string stored)
-        {
-            if (string.IsNullOrEmpty(stored))
-                return false;
-            string[] parts = stored.Split('$');
-            if (parts.Length != 4 || parts[0] != "pbkdf2")
-                return false;
-
-            int iterations;
-            if (!int.TryParse(parts[1], out iterations) || iterations < 1)
-                return false;
-
-            byte[] salt;
-            byte[] expected;
-            try
-            {
-                salt = Convert.FromBase64String(parts[2]);
-                expected = Convert.FromBase64String(parts[3]);
-            }
-            catch
-            {
-                return false;
-            }
-
-            using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations))
-            {
-                byte[] actual = pbkdf2.GetBytes(expected.Length);
-                return SlowEquals(expected, actual);
-            }
-        }
-
-        private static bool SlowEquals(byte[] a, byte[] b)
-        {
-            uint diff = (uint)a.Length ^ (uint)b.Length;
-            int n = Math.Min(a.Length, b.Length);
-            for (int i = 0; i < n; i++)
-                diff |= (uint)(a[i] ^ b[i]);
-            return diff == 0;
         }
     }
 

@@ -91,6 +91,9 @@
     <Compile Include="Program.cs" />
     <Compile Include="TinyHttpServer.cs" />
     <Compile Include="PortalService.cs" />
+    <Compile Include="..\Shared\PasswordHash.cs">
+      <Link>PasswordHash.cs</Link>
+    </Compile>
     <None Include="app.config" />
     <None Include="README.txt" />
   </ItemGroup>
