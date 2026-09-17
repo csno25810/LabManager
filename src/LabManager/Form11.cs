@@ -31,7 +31,8 @@ namespace LabManager
         private void buttonRegister_Click(object sender, EventArgs e)
         {
             string studentId = textBoxStudentId.Text.Trim();
-            string name = textBoxName.Text.Trim();
+            string familyName = textBoxName.Text.Trim();
+            string givenName = textBoxGivenName.Text.Trim();
             string mail = textBoxMail.Text.Trim();
 
             if (string.IsNullOrWhiteSpace(studentId))
@@ -40,11 +41,19 @@ namespace LabManager
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(name))
+            if (string.IsNullOrWhiteSpace(familyName))
             {
-                MessageBox.Show("氏名を入力してください。", "学生情報の追加");
+                MessageBox.Show("苗字を入力してください。", "学生情報の追加");
                 return;
             }
+
+            if (string.IsNullOrWhiteSpace(givenName))
+            {
+                MessageBox.Show("名前を入力してください。", "学生情報の追加");
+                return;
+            }
+
+            string name = familyName + " " + givenName;
 
             if (string.IsNullOrWhiteSpace(mail))
             {
@@ -78,6 +87,7 @@ namespace LabManager
             MessageBox.Show("登録しました。", "学生情報の追加");
             textBoxStudentId.Clear();
             textBoxName.Clear();
+            textBoxGivenName.Clear();
             textBoxMail.Clear();
         }
 

@@ -17,12 +17,15 @@ namespace LabManager
             this.tabPageAdd = new System.Windows.Forms.TabPage();
             this.buttonRegister = new System.Windows.Forms.Button();
             this.textBoxMail = new System.Windows.Forms.TextBox();
+            this.textBoxGivenName = new System.Windows.Forms.TextBox();
             this.textBoxName = new System.Windows.Forms.TextBox();
             this.textBoxStudentId = new System.Windows.Forms.TextBox();
             this.labelMail = new System.Windows.Forms.Label();
+            this.labelGivenName = new System.Windows.Forms.Label();
             this.labelName = new System.Windows.Forms.Label();
             this.labelStudentId = new System.Windows.Forms.Label();
             this.labelAddTitle = new System.Windows.Forms.Label();
+            this.labelNameHint = new System.Windows.Forms.Label();
             this.tabPageDelete = new System.Windows.Forms.TabPage();
             this.buttonDelete = new System.Windows.Forms.Button();
             this.dataGridViewStudents = new System.Windows.Forms.DataGridView();
@@ -51,10 +54,13 @@ namespace LabManager
             // tabPageAdd
             // 
             this.tabPageAdd.Controls.Add(this.buttonRegister);
+            this.tabPageAdd.Controls.Add(this.labelNameHint);
             this.tabPageAdd.Controls.Add(this.textBoxMail);
+            this.tabPageAdd.Controls.Add(this.textBoxGivenName);
             this.tabPageAdd.Controls.Add(this.textBoxName);
             this.tabPageAdd.Controls.Add(this.textBoxStudentId);
             this.tabPageAdd.Controls.Add(this.labelMail);
+            this.tabPageAdd.Controls.Add(this.labelGivenName);
             this.tabPageAdd.Controls.Add(this.labelName);
             this.tabPageAdd.Controls.Add(this.labelStudentId);
             this.tabPageAdd.Controls.Add(this.labelAddTitle);
@@ -68,20 +74,27 @@ namespace LabManager
             // 
             // buttonRegister
             // 
-            this.buttonRegister.Location = new System.Drawing.Point(463, 170);
+            this.buttonRegister.Location = new System.Drawing.Point(463, 220);
             this.buttonRegister.Name = "buttonRegister";
             this.buttonRegister.Size = new System.Drawing.Size(75, 23);
-            this.buttonRegister.TabIndex = 7;
+            this.buttonRegister.TabIndex = 9;
             this.buttonRegister.Text = "登録";
             this.buttonRegister.UseVisualStyleBackColor = true;
             this.buttonRegister.Click += new System.EventHandler(this.buttonRegister_Click);
             // 
             // textBoxMail
             // 
-            this.textBoxMail.Location = new System.Drawing.Point(120, 134);
+            this.textBoxMail.Location = new System.Drawing.Point(120, 170);
             this.textBoxMail.Name = "textBoxMail";
             this.textBoxMail.Size = new System.Drawing.Size(418, 19);
-            this.textBoxMail.TabIndex = 6;
+            this.textBoxMail.TabIndex = 8;
+            // 
+            // textBoxGivenName
+            // 
+            this.textBoxGivenName.Location = new System.Drawing.Point(120, 134);
+            this.textBoxGivenName.Name = "textBoxGivenName";
+            this.textBoxGivenName.Size = new System.Drawing.Size(250, 19);
+            this.textBoxGivenName.TabIndex = 6;
             // 
             // textBoxName
             // 
@@ -100,11 +113,20 @@ namespace LabManager
             // labelMail
             // 
             this.labelMail.AutoSize = true;
-            this.labelMail.Location = new System.Drawing.Point(20, 137);
+            this.labelMail.Location = new System.Drawing.Point(20, 173);
             this.labelMail.Name = "labelMail";
             this.labelMail.Size = new System.Drawing.Size(79, 12);
             this.labelMail.TabIndex = 3;
             this.labelMail.Text = "メールアドレス";
+            // 
+            // labelGivenName
+            // 
+            this.labelGivenName.AutoSize = true;
+            this.labelGivenName.Location = new System.Drawing.Point(20, 137);
+            this.labelGivenName.Name = "labelGivenName";
+            this.labelGivenName.Size = new System.Drawing.Size(29, 12);
+            this.labelGivenName.TabIndex = 11;
+            this.labelGivenName.Text = "名前";
             // 
             // labelName
             // 
@@ -113,7 +135,17 @@ namespace LabManager
             this.labelName.Name = "labelName";
             this.labelName.Size = new System.Drawing.Size(29, 12);
             this.labelName.TabIndex = 2;
-            this.labelName.Text = "氏名";
+            this.labelName.Text = "苗字";
+            // 
+            // labelNameHint
+            // 
+            this.labelNameHint.AutoSize = true;
+            this.labelNameHint.ForeColor = System.Drawing.SystemColors.GrayText;
+            this.labelNameHint.Location = new System.Drawing.Point(118, 196);
+            this.labelNameHint.Name = "labelNameHint";
+            this.labelNameHint.Size = new System.Drawing.Size(300, 12);
+            this.labelNameHint.TabIndex = 12;
+            this.labelNameHint.Text = "保存は「苗字 名前」。カレンダーの日直は空白より前を苗字として表示します。";
             // 
             // labelStudentId
             // 
@@ -251,9 +283,12 @@ namespace LabManager
         private System.Windows.Forms.Label labelAddTitle;
         private System.Windows.Forms.Label labelStudentId;
         private System.Windows.Forms.Label labelName;
+        private System.Windows.Forms.Label labelGivenName;
+        private System.Windows.Forms.Label labelNameHint;
         private System.Windows.Forms.Label labelMail;
         private System.Windows.Forms.TextBox textBoxStudentId;
         private System.Windows.Forms.TextBox textBoxName;
+        private System.Windows.Forms.TextBox textBoxGivenName;
         private System.Windows.Forms.TextBox textBoxMail;
         private System.Windows.Forms.Button buttonRegister;
         private System.Windows.Forms.Label labelDeleteTitle;
