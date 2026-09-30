@@ -102,9 +102,15 @@ namespace LabManager
             if (!EnsureSchema(out errorMessage))
                 return roster;
 
+            CleanupMissingStudents();
+
             var table = new DataTable();
             if (!Connector.TryTableReader(
-                    "SELECT weekday, slot, student_id FROM duty_weekday_roster ORDER BY weekday, slot",
+                    $@"SELECT r.weekday, r.slot, r.student_id
+                       FROM duty_weekday_roster r
+                       INNER JOIN personal_info pi ON pi.student_id = r.student_id
+                       WHERE {PersonalInfoHelper.SqlStudentsOnlyAliased}
+                       ORDER BY r.weekday, r.slot",
                     table,
                     out errorMessage))
             {
@@ -155,6 +161,33 @@ namespace LabManager
             return true;
         }
 
+        public static void RemoveStudent(string studentId)
+        {
+            if (string.IsNullOrWhiteSpace(studentId) || !EnsureSchema(out _))
+                return;
+
+            string id = EscapeSql(studentId.Trim());
+            Connector.TryExecuteCommand(
+                $"DELETE FROM duty_weekday_roster WHERE student_id = '{id}'",
+                out _);
+            Connector.TryExecuteCommand(
+                $"DELETE FROM duty_schedule WHERE student_id = '{id}'",
+                out _);
+        }
+
+        public static void CleanupMissingStudents()
+        {
+            if (!EnsureSchema(out _))
+                return;
+
+            Connector.TryExecuteCommand(
+                $@"DELETE r FROM duty_weekday_roster r
+                   LEFT JOIN personal_info pi ON pi.student_id = r.student_id
+                   WHERE r.student_id <> ''
+                     AND (pi.student_id IS NULL OR NOT ({PersonalInfoHelper.SqlStudentsOnlyAliased}))",
+                out _);
+        }
+
         public static string FormatRosterSummary(
             Dictionary<DayOfWeek, List<string>> roster,
             IList<StudentListItem> students)
@@ -178,11 +211,20 @@ namespace LabManager
                     continue;
                 }
 
-                var parts = ids.Select(id =>
+                var parts = ids
+                    .Where(id => nameById.ContainsKey(id))
+                    .Select(id =>
+                    {
+                        string name = nameById[id];
+                        return string.IsNullOrEmpty(name) ? id : id + " " + name;
+                    })
+                    .ToList();
+                if (parts.Count == 0)
                 {
-                    nameById.TryGetValue(id, out string name);
-                    return string.IsNullOrEmpty(name) ? id : id + " " + name;
-                });
+                    lines.Add(dayNames[i] + ": （未設定）");
+                    continue;
+                }
+
                 lines.Add(dayNames[i] + ": " + string.Join(" / ", parts));
             }
 

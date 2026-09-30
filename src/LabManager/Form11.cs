@@ -177,6 +177,7 @@ namespace LabManager
             if (!EnsureConnected())
                 return;
 
+            DutyWeekdayRosterStore.RemoveStudent(studentId);
             LabUserStore.DeleteForStudent(studentId);
             Connector.ExecuteCommand($"DELETE FROM personal_info WHERE student_id = '{EscapeSql(studentId)}'");
             MessageBox.Show("消去しました。", "学生情報の削除");

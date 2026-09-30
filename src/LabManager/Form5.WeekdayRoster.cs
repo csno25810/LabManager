@@ -13,6 +13,7 @@ namespace LabManager
         private Label lblRosterSummary;
         private TableLayoutPanel weekdayRosterTable;
         private List<StudentListItem> studentChoices = new List<StudentListItem>();
+        private bool loadingRoster;
 
         private static readonly DayOfWeek[] WeekdayOrder =
         {
@@ -74,6 +75,7 @@ namespace LabManager
                         Margin = new Padding(2),
                         Tag = WeekdayOrder[i]
                     };
+                    combo.SelectedIndexChanged += weekdayCombo_SelectedIndexChanged;
                     weekdaySlotCombos[i, slot] = combo;
                     weekdayRosterTable.Controls.Add(combo, slot + 1, i);
                 }
@@ -161,26 +163,42 @@ namespace LabManager
 
         private void InitWeekdayRosterPanel()
         {
-            studentChoices = DutyWeekdayRosterStore.LoadAllStudents(out string errorMessage);
-            if (!string.IsNullOrWhiteSpace(errorMessage))
+            loadingRoster = true;
+            try
             {
-                lblRosterSummary.Text = errorMessage;
-                return;
-            }
-
-            for (int i = 0; i < WeekdayOrder.Length; i++)
-            {
-                for (int slot = 0; slot < 2; slot++)
+                studentChoices = DutyWeekdayRosterStore.LoadAllStudents(out string errorMessage);
+                if (!string.IsNullOrWhiteSpace(errorMessage))
                 {
-                    ComboBox combo = weekdaySlotCombos[i, slot];
-                    combo.DataSource = null;
-                    combo.DisplayMember = "Display";
-                    combo.ValueMember = "StudentId";
-                    combo.DataSource = studentChoices.ToList();
+                    lblRosterSummary.Text = errorMessage;
+                    return;
                 }
-            }
 
-            LoadWeekdayRosterIntoUi();
+                for (int i = 0; i < WeekdayOrder.Length; i++)
+                {
+                    for (int slot = 0; slot < 2; slot++)
+                    {
+                        ComboBox combo = weekdaySlotCombos[i, slot];
+                        combo.DataSource = null;
+                        combo.DisplayMember = "Display";
+                        combo.ValueMember = "StudentId";
+                        combo.DataSource = studentChoices.ToList();
+                    }
+                }
+
+                LoadWeekdayRosterIntoUi();
+            }
+            finally
+            {
+                loadingRoster = false;
+            }
+        }
+
+        private void weekdayCombo_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (loadingRoster)
+                return;
+
+            UpdateRosterSummaryLabel(GetWeekdayRosterFromUi());
         }
 
         private void LoadWeekdayRosterIntoUi()

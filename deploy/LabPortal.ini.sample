@@ -1,0 +1,7 @@
+; このファイルを C:\MyReader\LabPortal.ini にコピーし、
+; Google Cloud の OAuth クライアント ID / シークレットを書く。
+; 空のままだと「Gmailアカウントでログイン」は未設定表示になる。
+; パスワードログインと入室ボタンは、この設定がなくても使える。
+
+GoogleClientId=
+GoogleClientSecret=

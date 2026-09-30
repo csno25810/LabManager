@@ -37,13 +37,15 @@ namespace LabPortal
 
         private readonly string connectionString;
         private readonly string serverIp;
+        private readonly GoogleSignIn google;
         private readonly ConcurrentDictionary<string, PortalSession> sessions =
             new ConcurrentDictionary<string, PortalSession>();
 
-        public PortalService(string connectionString, string serverIp)
+        public PortalService(string connectionString, string serverIp, string googleClientId, string googleClientSecret)
         {
             this.connectionString = connectionString;
             this.serverIp = serverIp;
+            google = new GoogleSignIn(googleClientId, googleClientSecret);
         }
 
         public HttpResponse Handle(HttpRequest request)
@@ -59,10 +61,16 @@ namespace LabPortal
 
             if (path == "/login")
                 return HandleLogin(request);
+            if (path == "/auth/google")
+                return HandleGoogleStart(request);
+            if (path == "/auth/google/callback")
+                return HandleGoogleCallback(request);
             if (path == "/logout")
                 return HandleLogout();
             if (path == "/attendance")
                 return HandleAttendance(request);
+            if (path == "/checkin")
+                return HandleCheckin(request);
             if (path == "/me")
                 return HandleMyHistory(request);
             if (path == "/password")
@@ -145,20 +153,74 @@ namespace LabPortal
         private HttpResponse HandleLogin(HttpRequest request)
         {
             if (request.Method == "GET")
-                return HttpResponse.Html(LoginPage(""));
+                return HttpResponse.Html(LoginPage("", request));
 
             string loginId = (request.FormValue("login_id") ?? "").Trim();
             string password = request.FormValue("password") ?? "";
             if (loginId.Length == 0 || password.Length == 0)
-                return HttpResponse.Html(LoginPage("ログインIDとパスワードを入力してください。"));
+                return HttpResponse.Html(LoginPage("学籍番号とパスワードを入力してください。", request));
 
             using (var conn = Open())
                 EnsureMissingUsers(conn);
 
             PortalSession session;
-            if (!TryLogin(loginId, password, out session))
-                return HttpResponse.Html(LoginPage("ログインIDまたはパスワードが違います。"));
+            string loginError;
+            if (!TryPasswordLogin(loginId, password, out session, out loginError))
+                return HttpResponse.Html(LoginPage(loginError ?? "学籍番号またはパスワードが違います。", request));
 
+            return CreateLoginResponse(session);
+        }
+
+        private HttpResponse HandleGoogleStart(HttpRequest request)
+        {
+            if (!google.IsConfigured)
+            {
+                return HttpResponse.Html(LoginPage(google.SetupHint, request));
+            }
+
+            if (!LanAccess.IsGoogleHostAllowed(request.Host))
+            {
+                return HttpResponse.Html(LoginPage(
+                    "Gmailログインは http://localhost:8080/ を、このPCのブラウザで開いたときだけ使えます。今は " +
+                    (request.Host ?? "") +
+                    " で開いているため、Google が拒否します。スマホからは学籍番号とパスワードでログインしてください。",
+                    request));
+            }
+
+            string redirectUri = request.PublicBaseUrl + "/auth/google/callback";
+            string state = NewToken();
+            google.Remember(state, redirectUri);
+            return HttpResponse.Redirect(google.AuthorizationUrl(state, redirectUri));
+        }
+
+        private HttpResponse HandleGoogleCallback(HttpRequest request)
+        {
+            string error = request.QueryValue("error");
+            if (!string.IsNullOrEmpty(error))
+                return HttpResponse.Html(LoginPage("Google ログインがキャンセルされました。", request));
+
+            string redirectUri;
+            if (!google.TryTake(request.QueryValue("state"), out redirectUri))
+                return HttpResponse.Html(LoginPage("Google ログインの有効期限が切れました。もう一度やり直してください。", request));
+
+            string email;
+            string googleError;
+            if (!google.TryGetEmail(request.QueryValue("code"), redirectUri, out email, out googleError))
+                return HttpResponse.Html(LoginPage(googleError ?? "Google ログインに失敗しました。", request));
+
+            using (var conn = Open())
+                EnsureMissingUsers(conn);
+
+            PortalSession session;
+            string matchError;
+            if (!TryStartSessionByMail(email, out session, out matchError))
+                return HttpResponse.Html(LoginPage(matchError, request));
+
+            return CreateLoginResponse(session);
+        }
+
+        private HttpResponse CreateLoginResponse(PortalSession session)
+        {
             string token = NewToken();
             sessions[token] = session;
             var response = HttpResponse.Redirect("/attendance");
@@ -182,7 +244,28 @@ namespace LabPortal
             int present;
             int visitors;
             List<AttendanceRow> rows = LoadAttendance(out present, out visitors);
-            return HttpResponse.Html(AttendancePage(session, rows, present, visitors));
+            return HttpResponse.Html(AttendancePage(
+                session, rows, present, visitors,
+                LanAccess.IsSameLan(request.ClientAddress),
+                request.QueryValue("checkin"),
+                request.QueryValue("msg")));
+        }
+
+        private HttpResponse HandleCheckin(HttpRequest request)
+        {
+            PortalSession session = GetSession(request);
+            if (session == null)
+                return HttpResponse.Redirect("/login");
+            if (request.Method != "POST")
+                return HttpResponse.Redirect("/attendance");
+            if (!LanAccess.IsSameLan(request.ClientAddress))
+                return HttpResponse.Redirect("/attendance?checkin=ng&msg=" + Uri.EscapeDataString("同一Wi-Fiのときだけ入室できます。"));
+
+            string error;
+            if (!TryRecordPortalTouch(session.StudentId, out error))
+                return HttpResponse.Redirect("/attendance?checkin=ng&msg=" + Uri.EscapeDataString(error ?? "記録に失敗しました。"));
+
+            return HttpResponse.Redirect("/attendance?checkin=ok");
         }
 
         private HttpResponse HandleMyHistory(HttpRequest request)
@@ -254,38 +337,144 @@ namespace LabPortal
             }
         }
 
-        private bool TryLogin(string loginId, string password, out PortalSession session)
+        private bool TryPasswordLogin(string loginOrEmail, string password, out PortalSession session, out string error)
         {
             session = null;
+            error = null;
             using (var conn = Open())
             using (var cmd = new MySqlCommand(
-                @"SELECT u.login_id, u.student_id, u.password_hash, u.role, IFNULL(p.name, '') AS name
-                  FROM lab_user u
-                  LEFT JOIN personal_info p ON u.student_id = p.student_id
-                  WHERE u.login_id = @login
-                  LIMIT 1", conn))
+                loginOrEmail.IndexOf('@') >= 0
+                    ? @"SELECT u.login_id, u.student_id, u.password_hash, u.role, IFNULL(p.name, '') AS name
+                        FROM personal_info p
+                        INNER JOIN lab_user u ON u.student_id = p.student_id
+                        WHERE LOWER(TRIM(p.mail)) = @login"
+                    : @"SELECT u.login_id, u.student_id, u.password_hash, u.role, IFNULL(p.name, '') AS name
+                        FROM lab_user u
+                        LEFT JOIN personal_info p ON u.student_id = p.student_id
+                        WHERE u.login_id = @login OR u.student_id = @login",
+                conn))
             {
-                cmd.Parameters.AddWithValue("@login", loginId);
+                cmd.Parameters.AddWithValue("@login",
+                    loginOrEmail.IndexOf('@') >= 0 ? loginOrEmail.ToLowerInvariant() : loginOrEmail);
                 using (var reader = cmd.ExecuteReader())
                 {
                     if (!reader.Read())
+                    {
+                        error = "学籍番号またはパスワードが違います。";
                         return false;
+                    }
 
                     string hash = Convert.ToString(reader["password_hash"]) ?? "";
                     if (!LabCommon.PasswordHash.Verify(password, hash))
-                        return false;
-
-                    session = new PortalSession
                     {
-                        LoginId = Convert.ToString(reader["login_id"]),
-                        StudentId = Convert.ToString(reader["student_id"]),
-                        Name = Convert.ToString(reader["name"]),
-                        Role = Convert.ToString(reader["role"]),
-                        ExpiresUtc = DateTime.UtcNow.AddHours(SessionHours)
-                    };
+                        error = "学籍番号またはパスワードが違います。";
+                        return false;
+                    }
+
+                    session = ReadSession(reader);
+                    if (reader.Read())
+                    {
+                        session = null;
+                        error = "同じメールアドレスが複数の学生に登録されています。学生情報管理で直してください。";
+                        return false;
+                    }
+
                     return true;
                 }
             }
+        }
+
+        private bool TryStartSessionByMail(string email, out PortalSession session, out string error)
+        {
+            session = null;
+            error = null;
+            email = (email ?? "").Trim().ToLowerInvariant();
+            if (email.Length == 0)
+            {
+                error = "Google からメールアドレスを取得できませんでした。";
+                return false;
+            }
+
+            using (var conn = Open())
+            using (var cmd = new MySqlCommand(
+                @"SELECT u.login_id, u.student_id, u.role, IFNULL(p.name, '') AS name
+                  FROM personal_info p
+                  INNER JOIN lab_user u ON u.student_id = p.student_id
+                  WHERE LOWER(TRIM(p.mail)) = @mail", conn))
+            {
+                cmd.Parameters.AddWithValue("@mail", email);
+                using (var reader = cmd.ExecuteReader())
+                {
+                    if (!reader.Read())
+                    {
+                        error = "この Gmail（" + email + "）は学生情報に登録されていません。先に LabManager の学生情報管理でメールを登録してください。";
+                        return false;
+                    }
+
+                    session = ReadSession(reader);
+                    if (reader.Read())
+                    {
+                        session = null;
+                        error = "同じメールアドレスが複数の学生に登録されています。学生情報管理で直してください。";
+                        return false;
+                    }
+
+                    return true;
+                }
+            }
+        }
+
+        private PortalSession ReadSession(MySqlDataReader reader)
+        {
+            return new PortalSession
+            {
+                LoginId = Convert.ToString(reader["login_id"]),
+                StudentId = Convert.ToString(reader["student_id"]),
+                Name = Convert.ToString(reader["name"]),
+                Role = Convert.ToString(reader["role"]),
+                ExpiresUtc = DateTime.UtcNow.AddHours(SessionHours)
+            };
+        }
+
+        private bool TryRecordPortalTouch(string studentId, out string error)
+        {
+            error = null;
+            if (string.IsNullOrWhiteSpace(studentId))
+            {
+                error = "学籍番号が空です。";
+                return false;
+            }
+
+            string chipId = "WEB:" + studentId.Trim();
+            try
+            {
+                using (var conn = Open())
+                {
+                    using (var ensure = new MySqlCommand(
+                        @"INSERT IGNORE INTO chip_list (chip_id, student_id, system_id)
+                          VALUES (@chip, @sid, 'WEB')", conn))
+                    {
+                        ensure.Parameters.AddWithValue("@chip", chipId);
+                        ensure.Parameters.AddWithValue("@sid", studentId);
+                        ensure.ExecuteNonQuery();
+                    }
+
+                    using (var insert = new MySqlCommand(
+                        @"INSERT INTO touch_log (time_stamp, terminal_id, chip_id)
+                          VALUES (NOW(), 'WEB', @chip)", conn))
+                    {
+                        insert.Parameters.AddWithValue("@chip", chipId);
+                        insert.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (MySqlException ex)
+            {
+                error = "記録に失敗しました。" + ex.Message;
+                return false;
+            }
+
+            return true;
         }
 
         private List<AttendanceRow> LoadAttendance(out int presentCount, out int visitorCount)
@@ -402,13 +591,6 @@ namespace LabPortal
             public string Type { get; set; }
         }
 
-        private sealed class DiaryEntry
-        {
-            public string Date { get; set; }
-            public string Title { get; set; }
-            public string Content { get; set; }
-        }
-
         private sealed class MyHistory
         {
             public int VisitDays { get; set; }
@@ -418,7 +600,6 @@ namespace LabPortal
             public List<DayVisit> Days { get; set; }
             public List<TouchEvent> Touches { get; set; }
             public List<DutyEvent> Duties { get; set; }
-            public List<DiaryEntry> Diaries { get; set; }
         }
 
         private MyHistory LoadMyHistory(string studentId)
@@ -430,8 +611,7 @@ namespace LabPortal
                 TodayLast = "-",
                 Days = new List<DayVisit>(),
                 Touches = new List<TouchEvent>(),
-                Duties = new List<DutyEvent>(),
-                Diaries = new List<DiaryEntry>()
+                Duties = new List<DutyEvent>()
             };
 
             DateTime from = DateTime.Today.AddDays(-30);
@@ -531,39 +711,6 @@ namespace LabPortal
                     }
                 }
 
-                try
-                {
-                    using (var cmd = new MySqlCommand(@"
-                        SELECT
-                            DATE_FORMAT(d.dialy_date, '%Y-%m-%d') AS diary_date,
-                            d.title,
-                            d.content
-                        FROM diary_log d
-                        WHERE d.student_id = @sid
-                          AND d.dialy_date >= @from
-                        ORDER BY d.dialy_date DESC
-                        LIMIT 20", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@sid", studentId);
-                        cmd.Parameters.AddWithValue("@from", from.ToString("yyyy-MM-dd"));
-                        using (var reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                history.Diaries.Add(new DiaryEntry
-                                {
-                                    Date = Convert.ToString(reader["diary_date"]),
-                                    Title = Convert.ToString(reader["title"]),
-                                    Content = Convert.ToString(reader["content"])
-                                });
-                            }
-                        }
-                    }
-                }
-                catch (MySqlException)
-                {
-                    // diary_log が無い環境では空のまま
-                }
             }
 
             return history;
@@ -579,11 +726,29 @@ namespace LabPortal
             }
         }
 
-        private string LoginPage(string error)
+        private string LoginPage(string error, HttpRequest request = null)
         {
             string errorHtml = string.IsNullOrEmpty(error)
                 ? ""
                 : "<p class=\"error\">" + HttpUtility.HtmlEncode(error) + "</p>";
+
+            bool googleHostOk = request == null || LanAccess.IsGoogleHostAllowed(request.Host);
+            string googleButton;
+            if (!google.IsConfigured)
+            {
+                googleButton = "<p class=\"or\">または</p><p class=\"hint\">" +
+                    HttpUtility.HtmlEncode(google.SetupHint) + "</p>";
+            }
+            else if (!googleHostOk)
+            {
+                googleButton = "<p class=\"or\">または</p><p class=\"hint\">Gmailログインは " +
+                    "<a href=\"http://localhost:8080/login\">http://localhost:8080/</a> " +
+                    "をこのPCのブラウザで開いたときだけ使えます。スマホからは学籍番号でログインしてください。</p>";
+            }
+            else
+            {
+                googleButton = "<p class=\"or\">または</p><p><a class=\"google\" href=\"/auth/google\">Gmailアカウントでログイン</a></p>";
+            }
 
             return Wrap("ログイン",
                 "<h1>LabPortal</h1>" +
@@ -591,18 +756,28 @@ namespace LabPortal
                 "<p class=\"muted\">接続先: " + HttpUtility.HtmlEncode(serverIp) + "</p>" +
                 errorHtml +
                 "<form method=\"post\" action=\"/login\">" +
-                "<label>ログインID<br><input name=\"login_id\" autocomplete=\"username\" required></label>" +
+                "<label>学籍番号<br><input name=\"login_id\" type=\"text\" autocomplete=\"username\" required></label>" +
                 "<label>パスワード<br><input name=\"password\" type=\"password\" autocomplete=\"current-password\" required></label>" +
                 "<button type=\"submit\">ログイン</button>" +
                 "</form>" +
-                "<p class=\"hint\">学生は学籍番号、先生は teacher。<br>初回のパスワードは " +
-                HttpUtility.HtmlEncode(LabCommon.PasswordHash.DefaultPassword) + " です。</p>");
+                googleButton +
+                "<p class=\"hint\">学生は学籍番号、先生は teacher。<br>初期パスワードは " +
+                HttpUtility.HtmlEncode(LabCommon.PasswordHash.DefaultPassword) + " です。<br>" +
+                "Gmailログインは、学生情報に登録したメールと Google アカウントが一致したときだけ使えます。</p>");
         }
 
-        private string AttendancePage(PortalSession session, List<AttendanceRow> rows, int present, int visitors)
+        private string AttendancePage(
+            PortalSession session,
+            List<AttendanceRow> rows,
+            int present,
+            int visitors,
+            bool sameLan,
+            string checkin,
+            string message)
         {
             var sb = new StringBuilder();
             sb.Append(Nav(session, "attendance"));
+            sb.Append(CheckinBox(session, rows, sameLan, checkin, message));
             sb.Append("<p class=\"kpi\">在室 ").Append(present).Append(" 人　|　本日来室 ").Append(visitors).Append(" 人</p>");
             sb.Append("<p class=\"muted\">判定はテレビ右画面と同じです（当日タッチ奇数=在席）。30秒ごとに更新します。</p>");
             sb.Append("<table><thead><tr><th>学籍番号</th><th>氏名</th><th>初回</th><th>最終</th><th>状態</th></tr></thead><tbody>");
@@ -675,25 +850,6 @@ namespace LabPortal
                 sb.Append("</tbody></table>");
             }
 
-            sb.Append("<h2>日誌（直近30日）</h2>");
-            if (history.Diaries.Count == 0)
-            {
-                sb.Append("<p class=\"muted\">この期間の日誌はありません。</p>");
-            }
-            else
-            {
-                foreach (DiaryEntry diary in history.Diaries)
-                {
-                    sb.Append("<article class=\"diary\"><h3>")
-                        .Append(HttpUtility.HtmlEncode(diary.Date))
-                        .Append("　")
-                        .Append(HttpUtility.HtmlEncode(diary.Title))
-                        .Append("</h3><p>")
-                        .Append(HttpUtility.HtmlEncode(diary.Content ?? ""))
-                        .Append("</p></article>");
-                }
-            }
-
             sb.Append("<h2>タッチ履歴（直近30日・最大80件）</h2>");
             if (history.Touches.Count == 0)
             {
@@ -713,6 +869,50 @@ namespace LabPortal
             }
 
             return Wrap("自分の履歴", sb.ToString());
+        }
+
+        private string CheckinBox(
+            PortalSession session,
+            List<AttendanceRow> rows,
+            bool sameLan,
+            string checkin,
+            string message)
+        {
+            AttendanceRow mine = null;
+            foreach (AttendanceRow row in rows)
+            {
+                if (string.Equals(row.StudentId, session.StudentId, StringComparison.Ordinal))
+                {
+                    mine = row;
+                    break;
+                }
+            }
+
+            bool present = mine != null && mine.Present;
+            string label = present ? "退室する" : "入室する";
+            var sb = new StringBuilder();
+            sb.Append("<section class=\"checkin\">");
+            sb.Append("<p><strong>自分の状態　").Append(present ? "在席" : "不在").Append("</strong></p>");
+            if (checkin == "ok")
+                sb.Append("<p class=\"ok\">記録しました。テレビの在席表示にも反映されます。</p>");
+            else if (checkin == "ng")
+                sb.Append("<p class=\"error\">").Append(HttpUtility.HtmlEncode(string.IsNullOrEmpty(message) ? "記録できませんでした。" : message)).Append("</p>");
+
+            if (sameLan)
+            {
+                sb.Append("<form method=\"post\" action=\"/checkin\">")
+                    .Append("<button type=\"submit\">").Append(label).Append("</button>")
+                    .Append("</form>");
+                sb.Append("<p class=\"hint\">同一Wi-Fiからの操作です。カードを持っていなくても記録できます。</p>");
+            }
+            else
+            {
+                sb.Append("<p><button type=\"button\" disabled>").Append(label).Append("</button></p>");
+                sb.Append("<p class=\"error\">同一Wi-Fiのときだけ押せます。研究室（またはこのPC）のネットワークに接続してください。</p>");
+            }
+
+            sb.Append("</section>");
+            return sb.ToString();
         }
 
         private string PasswordPage(PortalSession session, string error, string ok)
@@ -793,6 +993,11 @@ namespace LabPortal
                    "form{display:flex;flex-direction:column;gap:12px;background:#fff;padding:16px;border:1px solid #ddd;}" +
                    "input{font-size:1rem;padding:10px;width:100%;box-sizing:border-box;}" +
                    "button{font-size:1rem;padding:12px;background:#111;color:#fff;border:0;}" +
+                   "button:disabled{background:#bbb;color:#666;}" +
+                   "a.google{display:block;text-align:center;padding:12px;border:1px solid #111;background:#fff;text-decoration:none;font-weight:bold;}" +
+                   ".or{text-align:center;margin:16px 0 8px;}" +
+                   "section.checkin{background:#fff;border:1px solid #111;padding:12px;margin:0 0 16px;}" +
+                   "section.checkin form{border:0;padding:0;background:transparent;}" +
                    ".error{color:#a40000;font-weight:bold;}" +
                    ".ok{color:#0a5a0a;font-weight:bold;}" +
                    ".muted,.hint{color:#666;font-size:.9rem;}" +
@@ -800,9 +1005,6 @@ namespace LabPortal
                    "nav{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #ccc;}" +
                    "nav a.current{font-weight:bold;}" +
                    "h2{font-size:1.1rem;margin:20px 0 8px;}" +
-                   "article.diary{background:#fff;border:1px solid #ccc;padding:10px;margin-bottom:8px;}" +
-                   "article.diary h3{font-size:1rem;margin:0 0 8px;}" +
-                   "article.diary p{margin:0;white-space:pre-wrap;text-align:left;}" +
                    ".kpi{background:#fff;border:1px solid #111;padding:12px;font-weight:bold;text-align:center;}" +
                    "table{width:100%;border-collapse:collapse;background:#fff;}" +
                    "th,td{border:1px solid #ccc;padding:8px;text-align:center;}" +
@@ -863,6 +1065,33 @@ namespace LabPortal
             }
 
             return true;
+        }
+
+        public static void TryReadGoogle(out string clientId, out string clientSecret)
+        {
+            clientId = "";
+            clientSecret = "";
+            ReadGoogleKeys(@"C:\MyReader\SQLReader.ini", ref clientId, ref clientSecret);
+            ReadGoogleKeys(@"C:\MyReader\LabPortal.ini", ref clientId, ref clientSecret);
+        }
+
+        private static void ReadGoogleKeys(string path, ref string clientId, ref string clientSecret)
+        {
+            if (!File.Exists(path))
+                return;
+
+            foreach (string raw in File.ReadAllLines(path))
+            {
+                int eq = raw.IndexOf('=');
+                if (eq <= 0)
+                    continue;
+                string key = raw.Substring(0, eq).Trim();
+                string value = raw.Substring(eq + 1).Trim();
+                if (key == "GoogleClientId" && !string.IsNullOrEmpty(value))
+                    clientId = value;
+                if (key == "GoogleClientSecret" && !string.IsNullOrEmpty(value))
+                    clientSecret = value;
+            }
         }
     }
 }

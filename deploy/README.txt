@@ -298,9 +298,10 @@ exe の再ビルドは不要。ini を保存して LabManager を起動し直す
 
   起動: bin\Release\LabPortal.exe
   URL : http://localhost:8080/
-  学生: 学籍番号 / 初期パスワード lab2026
-  先生: teacher / lab2026
-  パスワード変更: ログイン後「パスワード」（4文字以上）
+  ログイン: 学籍番号 + パスワード（先生は teacher）
+  初期パスワード: lab2026
+  Gmailログイン: C:\MyReader\LabPortal.ini に Client ID / Secret（deploy\LabPortal.ini.sample）
+  入室ボタン: 同一 LAN のときだけ押せる。学生証は不要。
 
   同一 LAN のスマホは、コンソールに出る http://<PCのIP>:8080/ を開く。
   Windows ファイアウォールで TCP 8080 を許可すること。

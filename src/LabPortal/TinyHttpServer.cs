@@ -15,8 +15,11 @@ namespace LabPortal
         public string Path { get; set; }
         public Dictionary<string, string> Headers { get; set; }
         public Dictionary<string, string> Cookies { get; set; }
+        public Dictionary<string, string> Query { get; set; }
         public Dictionary<string, string> Form { get; set; }
         public string Body { get; set; }
+        public string Host { get; set; }
+        public IPAddress ClientAddress { get; set; }
 
         public string Cookie(string name)
         {
@@ -28,6 +31,23 @@ namespace LabPortal
         {
             string value;
             return Form != null && Form.TryGetValue(name, out value) ? value : "";
+        }
+
+        public string QueryValue(string name)
+        {
+            string value;
+            return Query != null && Query.TryGetValue(name, out value) ? value : "";
+        }
+
+        public string PublicBaseUrl
+        {
+            get
+            {
+                string host = Host;
+                if (string.IsNullOrEmpty(host))
+                    host = "localhost";
+                return "http://" + host;
+            }
         }
     }
 
@@ -103,6 +123,13 @@ namespace LabPortal
                     HttpRequest request = ReadRequest(stream);
                     if (request == null)
                         return;
+                    try
+                    {
+                        request.ClientAddress = ((IPEndPoint)client.Client.RemoteEndPoint).Address;
+                    }
+                    catch
+                    {
+                    }
 
                     HttpResponse response;
                     try
@@ -192,9 +219,13 @@ namespace LabPortal
             string rawPath = parts[1];
             int q = rawPath.IndexOf('?');
             string path = q >= 0 ? rawPath.Substring(0, q) : rawPath;
+            string query = q >= 0 ? rawPath.Substring(q + 1) : "";
             path = HttpUtility.UrlDecode(path) ?? "/";
             if (path.Length > 1 && path.EndsWith("/"))
                 path = path.TrimEnd('/');
+
+            string host;
+            headers.TryGetValue("Host", out host);
 
             var request = new HttpRequest
             {
@@ -202,10 +233,27 @@ namespace LabPortal
                 Path = path,
                 Headers = headers,
                 Body = body,
+                Host = host,
                 Cookies = ParseCookies(headers),
+                Query = ParseQuery(query),
                 Form = ParseForm(headers, body)
             };
             return request;
+        }
+
+        private static Dictionary<string, string> ParseQuery(string query)
+        {
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string pair in (query ?? "").Split('&'))
+            {
+                if (string.IsNullOrEmpty(pair))
+                    continue;
+                int eq = pair.IndexOf('=');
+                string name = eq >= 0 ? pair.Substring(0, eq) : pair;
+                string value = eq >= 0 ? pair.Substring(eq + 1) : "";
+                values[HttpUtility.UrlDecode(name) ?? name] = HttpUtility.UrlDecode(value) ?? value;
+            }
+            return values;
         }
 
         private static Dictionary<string, string> ParseCookies(Dictionary<string, string> headers)

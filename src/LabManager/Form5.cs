@@ -713,12 +713,14 @@ namespace LabManager
                 return;
             }
 
-            var weekdayStudents = DutyWeekdayRosterStore.LoadRoster(out string rosterError);
-            if (!string.IsNullOrWhiteSpace(rosterError))
+            var weekdayStudents = GetWeekdayRosterFromUi();
+            if (!DutyWeekdayRosterStore.SaveRoster(weekdayStudents, out string rosterError))
             {
-                MessageBox.Show(rosterError, "日直登録");
+                MessageBox.Show(rosterError ?? "担当の保存に失敗しました。", "日直登録");
                 return;
             }
+
+            UpdateRosterSummaryLabel(weekdayStudents);
 
             if (weekdayStudents.Values.All(ids => ids.Count == 0))
             {
