@@ -18,6 +18,7 @@ namespace LabManager
         private int calendarAreaHeight;
         private int todayAreaHeight;
         private Button btnRefresh;
+        private bool tvReady;
 
         public Form14(Setting settings)
         {
@@ -27,64 +28,170 @@ namespace LabManager
 
         public void ConfigureForTvDisplay()
         {
-            int winHeight = Screen.PrimaryScreen.Bounds.Height - 50;
             int winWidth = Screen.PrimaryScreen.Bounds.Width / 2;
-            todayAreaHeight = winHeight / 3;
-            calendarAreaHeight = winHeight - todayAreaHeight;
-            const int monthBarHeight = 36;
-            const int weekdayBarHeight = 24;
-            const int todayHeaderHeight = 28;
-
+            int winHeight = Screen.PrimaryScreen.Bounds.Height - 50;
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.Manual;
             Location = new Point(0, 0);
             Size = new Size(winWidth, winHeight);
-            BackColor = Color.White;
+            EnsureTvLayout();
+            ApplyTvLayout(winWidth, winHeight);
+        }
 
+        public void ConfigureAsEmbedded()
+        {
+            FormBorderStyle = FormBorderStyle.None;
+            ControlBox = false;
+            ShowInTaskbar = false;
+            Dock = DockStyle.Fill;
+            EnsureTvLayout();
+            Resize -= EmbeddedResize;
+            Resize += EmbeddedResize;
+        }
+
+        private void EmbeddedResize(object sender, EventArgs e)
+        {
+            if (ClientSize.Width > 80 && ClientSize.Height > 80)
+                ApplyTvLayout(ClientSize.Width, ClientSize.Height);
+        }
+
+        private void EnsureTvLayout()
+        {
+            if (tvReady)
+                return;
+
+            BackColor = Color.White;
             lblMonth.Font = UiFonts.Get(14F, FontStyle.Bold);
             lblMonth.ForeColor = Color.Black;
-            lblMonth.Location = new Point(0, 0);
-            lblMonth.Size = new Size(winWidth - 80, monthBarHeight);
             lblMonth.TextAlign = ContentAlignment.MiddleCenter;
 
             btnRefresh = new Button
             {
                 Text = "更新",
-                Location = new Point(winWidth - 72, 4),
                 Size = new Size(64, 28),
                 Font = UiFonts.Get(9F, FontStyle.Bold)
             };
             btnRefresh.Click += btnRefresh_Click;
 
-            tableWeekdays.Location = new Point(0, monthBarHeight);
-            tableWeekdays.Size = new Size(winWidth, weekdayBarHeight);
-            BuildWeekdayHeader();
-
-            tableCalendar.Location = new Point(0, monthBarHeight + weekdayBarHeight);
-            tableCalendar.Size = new Size(winWidth, calendarAreaHeight - monthBarHeight - weekdayBarHeight);
-
             lblTodayHeader.Font = UiFonts.Get(11F, FontStyle.Bold);
             lblTodayHeader.ForeColor = Color.Black;
             lblTodayHeader.BackColor = Color.White;
             lblTodayHeader.BorderStyle = BorderStyle.FixedSingle;
-            lblTodayHeader.Location = new Point(0, calendarAreaHeight);
-            lblTodayHeader.Size = new Size(winWidth, todayHeaderHeight);
 
-            listViewToday.Font = UiFonts.Get(11F);
+            tableToday.ColumnCount = 2;
+            tableToday.RowCount = 2;
+            tableToday.CellBorderStyle = TableLayoutPanelCellBorderStyle.Single;
+            tableToday.Margin = new Padding(0);
+            tableToday.Padding = new Padding(0);
+
+            lblScheduleTitle.Text = "  本日の予定";
+            lblScheduleTitle.Dock = DockStyle.Fill;
+            lblScheduleTitle.TextAlign = ContentAlignment.MiddleLeft;
+            lblScheduleTitle.Font = UiFonts.Get(10F, FontStyle.Bold);
+            lblScheduleTitle.ForeColor = Color.Black;
+            lblScheduleTitle.BackColor = Color.White;
+
+            lblQrTitle.Text = "LabPortal";
+            lblQrTitle.Dock = DockStyle.Fill;
+            lblQrTitle.TextAlign = ContentAlignment.MiddleCenter;
+            lblQrTitle.Font = UiFonts.Get(10F, FontStyle.Bold);
+            lblQrTitle.ForeColor = Color.Black;
+            lblQrTitle.BackColor = Color.White;
+
+            listViewToday.Dock = DockStyle.Fill;
+            listViewToday.Font = UiFonts.Get(12F);
             listViewToday.ForeColor = Color.Black;
             listViewToday.BackColor = Color.White;
-            listViewToday.BorderStyle = BorderStyle.FixedSingle;
-            listViewToday.Location = new Point(0, calendarAreaHeight + todayHeaderHeight);
-            listViewToday.Size = new Size(winWidth, todayAreaHeight - todayHeaderHeight);
-            listViewToday.Columns[0].Width = 72;
-            listViewToday.Columns[1].Width = winWidth - 72 - 4;
+            listViewToday.BorderStyle = BorderStyle.None;
+            listViewToday.HeaderStyle = ColumnHeaderStyle.None;
+
+            panelQr.Dock = DockStyle.Fill;
+            panelQr.BackColor = Color.White;
+            panelQr.Margin = new Padding(0);
+            panelQr.Resize += (sender, e) => LayoutQrPanel();
+
+            picPortalQr.SizeMode = PictureBoxSizeMode.Zoom;
+            picPortalQr.BackColor = Color.White;
+            picPortalQr.BorderStyle = BorderStyle.None;
+
+            lblPortalQr.Font = UiFonts.Get(8F);
+            lblPortalQr.ForeColor = Color.Black;
+            lblPortalQr.TextAlign = ContentAlignment.TopCenter;
+
+            if (picPortalQr.Parent != panelQr)
+                panelQr.Controls.Add(picPortalQr);
+            if (lblPortalQr.Parent != panelQr)
+                panelQr.Controls.Add(lblPortalQr);
+
+            tableToday.Controls.Add(lblScheduleTitle, 0, 0);
+            tableToday.Controls.Add(lblQrTitle, 1, 0);
+            tableToday.Controls.Add(listViewToday, 0, 1);
+            tableToday.Controls.Add(panelQr, 1, 1);
 
             Controls.Add(btnRefresh);
             Controls.Add(lblMonth);
             Controls.Add(tableWeekdays);
             Controls.Add(tableCalendar);
             Controls.Add(lblTodayHeader);
-            Controls.Add(listViewToday);
+            Controls.Add(tableToday);
+            BuildWeekdayHeader();
+            tvReady = true;
+        }
+
+        private void ApplyTvLayout(int winWidth, int winHeight)
+        {
+            todayAreaHeight = winHeight / 3;
+            calendarAreaHeight = winHeight - todayAreaHeight;
+            const int monthBarHeight = 36;
+            const int weekdayBarHeight = 24;
+            const int todayHeaderHeight = 28;
+
+            lblMonth.Location = new Point(0, 0);
+            lblMonth.Size = new Size(winWidth - 80, monthBarHeight);
+            btnRefresh.Location = new Point(winWidth - 72, 4);
+
+            tableWeekdays.Location = new Point(0, monthBarHeight);
+            tableWeekdays.Size = new Size(winWidth, weekdayBarHeight);
+
+            tableCalendar.Location = new Point(0, monthBarHeight + weekdayBarHeight);
+            tableCalendar.Size = new Size(winWidth, calendarAreaHeight - monthBarHeight - weekdayBarHeight);
+
+            lblTodayHeader.Location = new Point(0, calendarAreaHeight);
+            lblTodayHeader.Size = new Size(winWidth, todayHeaderHeight);
+
+            tableToday.Location = new Point(0, calendarAreaHeight + todayHeaderHeight);
+            tableToday.Size = new Size(winWidth, todayAreaHeight - todayHeaderHeight);
+            tableToday.ColumnStyles.Clear();
+            tableToday.RowStyles.Clear();
+            tableToday.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 64F));
+            tableToday.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 36F));
+            tableToday.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));
+            tableToday.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            if (listViewToday.Columns.Count >= 2)
+            {
+                listViewToday.Columns[0].Width = 88;
+                listViewToday.Columns[1].Width = Math.Max(120, (int)(winWidth * 0.64) - 100);
+            }
+
+            LayoutQrPanel();
+        }
+
+        private void LayoutQrPanel()
+        {
+            if (panelQr == null || picPortalQr == null || lblPortalQr == null)
+                return;
+
+            int pad = 10;
+            int labelHeight = 40;
+            int side = Math.Min(panelQr.ClientSize.Width, panelQr.ClientSize.Height - labelHeight) - pad * 2;
+            if (side < 72)
+                side = Math.Max(48, panelQr.ClientSize.Width - pad * 2);
+
+            picPortalQr.Size = new Size(side, side);
+            picPortalQr.Location = new Point(Math.Max(0, (panelQr.ClientSize.Width - side) / 2), pad);
+            lblPortalQr.Location = new Point(6, picPortalQr.Bottom + 2);
+            lblPortalQr.Size = new Size(Math.Max(40, panelQr.ClientSize.Width - 12), labelHeight);
         }
 
         private void btnRefresh_Click(object sender, EventArgs e)
@@ -150,6 +257,33 @@ namespace LabManager
 
             DisplayMonthCalendar(displayedMonth);
             DisplayTodayInfo(today);
+            RefreshPortalQr();
+        }
+
+        private void RefreshPortalQr()
+        {
+            if (picPortalQr == null)
+                return;
+
+            string url = PortalLink.FindUrl();
+            if (string.IsNullOrEmpty(url))
+            {
+                lblPortalQr.Text = "接続先がありません";
+                if (picPortalQr.Image != null)
+                {
+                    picPortalQr.Image.Dispose();
+                    picPortalQr.Image = null;
+                }
+                return;
+            }
+
+            Bitmap qr = PortalLink.CreateQr(url, 4);
+            Image old = picPortalQr.Image;
+            picPortalQr.Image = qr;
+            if (old != null)
+                old.Dispose();
+            lblPortalQr.Text = "スマホで開く\r\n" + url;
+            LayoutQrPanel();
         }
 
         private void DisplayMonthCalendar(DateTime targetMonth)

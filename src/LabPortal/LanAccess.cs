@@ -1,6 +1,5 @@
 using System;
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
 namespace LabPortal
@@ -40,31 +39,33 @@ namespace LabPortal
             return hostHeader;
         }
 
-        public static bool IsSameLan(IPAddress client)
+        public static bool CanCheckIn(IPAddress client)
         {
             client = Normalize(client);
             if (client == null)
                 return false;
             if (IPAddress.IsLoopback(client))
                 return true;
+            return IsPrivate(client);
+        }
 
-            foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
-            {
-                if (nic.OperationalStatus != OperationalStatus.Up)
-                    continue;
+        public static bool IsSameLan(IPAddress client)
+        {
+            return CanCheckIn(client);
+        }
 
-                foreach (UnicastIPAddressInformation address in nic.GetIPProperties().UnicastAddresses)
-                {
-                    IPAddress local = Normalize(address.Address);
-                    if (local == null || local.AddressFamily != AddressFamily.InterNetwork)
-                        continue;
-                    if (IPAddress.IsLoopback(local))
-                        continue;
-                    if (InSameSubnet(client, local, address.IPv4Mask))
-                        return true;
-                }
-            }
+        private static bool IsPrivate(IPAddress client)
+        {
+            if (client.AddressFamily != AddressFamily.InterNetwork)
+                return false;
 
+            byte[] b = client.GetAddressBytes();
+            if (b[0] == 10)
+                return true;
+            if (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
+                return true;
+            if (b[0] == 192 && b[1] == 168)
+                return true;
             return false;
         }
 
@@ -75,27 +76,6 @@ namespace LabPortal
             if (address.IsIPv4MappedToIPv6)
                 return address.MapToIPv4();
             return address;
-        }
-
-        private static bool InSameSubnet(IPAddress client, IPAddress local, IPAddress mask)
-        {
-            if (client.AddressFamily != AddressFamily.InterNetwork ||
-                local.AddressFamily != AddressFamily.InterNetwork ||
-                mask == null || mask.AddressFamily != AddressFamily.InterNetwork)
-            {
-                return false;
-            }
-
-            byte[] clientBytes = client.GetAddressBytes();
-            byte[] localBytes = local.GetAddressBytes();
-            byte[] maskBytes = mask.GetAddressBytes();
-            for (int i = 0; i < 4; i++)
-            {
-                if ((clientBytes[i] & maskBytes[i]) != (localBytes[i] & maskBytes[i]))
-                    return false;
-            }
-
-            return true;
         }
     }
 }

@@ -83,6 +83,10 @@
     <Reference Include="Portable.System.DateTimeOnly, Version=9.0.0.1, Culture=neutral, PublicKeyToken=16fb7a27ac3b9689, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Portable.System.DateTimeOnly.9.0.0\lib\net462\Portable.System.DateTimeOnly.dll</HintPath>
     </Reference>
+    <Reference Include="QRCoder">
+      <HintPath>..\..\packages\QRCoder.1.4.3\lib\net40\QRCoder.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Buffers, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\..\packages\System.Buffers.4.6.1\lib\net462\System.Buffers.dll</HintPath>
@@ -162,9 +166,13 @@
     <Compile Include="Form15.Designer.cs">
       <DependentUpon>Form15.cs</DependentUpon>
     </Compile>
+    <Compile Include="Form16.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="LabCalendarStore.cs" />
     <Compile Include="DutyWeekdayRosterStore.cs" />
     <Compile Include="PersonalInfoHelper.cs" />
+    <Compile Include="PortalLink.cs" />
     <Compile Include="LabUserStore.cs" />
     <Compile Include="..\Shared\PasswordHash.cs">
       <Link>PasswordHash.cs</Link>

@@ -164,21 +164,19 @@ namespace LabManager
             bool isToday = target == DateTime.Today;
 
             DataTable students = QueryAttendance(day, PersonalInfoHelper.SqlStudentsOnlyAliased, warnings);
-            DataTable teacher = QueryAttendance(day, "pi.student_id = '" + PersonalInfoHelper.TeacherStudentId + "'", warnings);
             if (students == null)
             {
                 gridAttendance.DataSource = null;
                 return;
             }
 
-            if (teacher != null)
-            {
-                foreach (DataRow row in teacher.Rows)
-                    students.ImportRow(row);
-            }
-
             presentCount = ApplyAttendanceState(students, isToday);
             visitorCount = CountVisitors(students);
+            for (int i = students.Rows.Count - 1; i >= 0; i--)
+            {
+                if (Convert.ToInt32(students.Rows[i]["touch_count"]) <= 0)
+                    students.Rows.RemoveAt(i);
+            }
 
             if (students.Columns.Contains("touch_count"))
                 students.Columns.Remove("touch_count");

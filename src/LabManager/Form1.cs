@@ -24,15 +24,11 @@ namespace LabManager
         int ClockMargin = 50;
         int SummaryBarHeight = 40;
         int DutyHeaderHeight = 28;
-        int TeacherSectionHeaderHeight = 24;
         int studentGridHeight;
-        int teacherRowHeight;
         static readonly TimeSpan DutyDeadline = new TimeSpan(8, 50, 0);
 
         private Label lblOccupancy;
         private Label lblDutyHeader;
-        private Label lblTeacherHeader;
-        private DataGridView dataGridViewTeacher;
 
         // 設定ファイルをリードする
         public Setting mySqlSet = new Setting();
@@ -43,9 +39,16 @@ namespace LabManager
         private DateTime? lastPenaltyRunDate;
         /// <summary>テレビ左半分の表示専用カレンダー (TvCalendarPanel / Form14)</summary>
         private Form14 tvLeftPanel;
+        private readonly bool embedMode;
 
-        public Form1()
+        public Form1() : this(false)
         {
+        }
+
+        public Form1(bool embedMode)
+        {
+            this.embedMode = embedMode;
+
             // コンポーネント生成
             InitializeComponent();
             dataGridView1.ColumnHeaderMouseClick += new DataGridViewCellMouseEventHandler(this.dataGridView1_ColumnHeaderMouseClick);
@@ -54,11 +57,19 @@ namespace LabManager
             if (mySqlSet.ReadSetting())
                 mySqlSet.CreateFile();
 
-            // フォームのサイズを変更
-            this.Size = new System.Drawing.Size(winWidth, winHeight);
-            this.StartPosition = FormStartPosition.Manual;
-            //this.Location = new Point(winWidth, 0);
-            this.Location = new Point(winWidth, 0);
+            if (embedMode)
+            {
+                FormBorderStyle = FormBorderStyle.None;
+                ShowInTaskbar = false;
+                Dock = DockStyle.Fill;
+            }
+            else
+            {
+                // フォームのサイズを変更
+                this.Size = new System.Drawing.Size(winWidth, winHeight);
+                this.StartPosition = FormStartPosition.Manual;
+                this.Location = new Point(winWidth, 0);
+            }
 
             // 在室人数サマリー
             lblOccupancy = new Label
@@ -92,43 +103,10 @@ namespace LabManager
             int grid1Height = winHeight * 2 / 3 - SummaryBarHeight - DutyHeaderHeight;
             int grid2Top = winHeight * 2 / 3;
             int grid2Height = winHeight * 1 / 3 - btn1Size - ClockMargin;
-            teacherRowHeight = CalcAttendanceRowHeight(7);
-            int teacherBlockHeight = TeacherSectionHeaderHeight + teacherRowHeight + 2;
-            studentGridHeight = grid1Height - teacherBlockHeight;
+            studentGridHeight = grid1Height;
 
             lblDutyHeader.Location = new Point(0, SummaryBarHeight + grid1Height);
             lblDutyHeader.Size = new Size(winWidth, DutyHeaderHeight);
-
-            lblTeacherHeader = new Label
-            {
-                Location = new Point(0, SummaryBarHeight + studentGridHeight),
-                Size = new Size(winWidth, TeacherSectionHeaderHeight),
-                Font = UiFonts.Get(10F, FontStyle.Bold),
-                ForeColor = Color.Black,
-                BackColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Text = "  【先生】"
-            };
-
-            dataGridViewTeacher = new DataGridView
-            {
-                Location = new Point(0, SummaryBarHeight + studentGridHeight + TeacherSectionHeaderHeight),
-                Size = new Size(winWidth, teacherRowHeight + 2),
-                RowHeadersVisible = false,
-                ColumnHeadersVisible = false,
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                AllowUserToResizeColumns = false,
-                AllowUserToResizeRows = false,
-                ReadOnly = true,
-                MultiSelect = false,
-                ScrollBars = ScrollBars.None,
-                Font = UiFonts.Get(15F),
-                BackgroundColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle
-            };
-            dataGridViewTeacher.CellFormatting += AttendanceGrid_CellFormatting;
 
             // データ表示部分の初期設定
             dataGridView1.Location = new Point(0, SummaryBarHeight);
@@ -142,7 +120,6 @@ namespace LabManager
             dataGridView1.CellFormatting += AttendanceGrid_CellFormatting;
 
             ConfigureAttendanceGrid(dataGridView1);
-            ConfigureAttendanceGrid(dataGridViewTeacher);
 
             dataGridView2.Location = new Point(0, grid2Top);
             dataGridView2.Size = new Size(winWidth, grid2Height);
@@ -189,12 +166,8 @@ namespace LabManager
 
             Controls.Add(lblOccupancy);
             Controls.Add(lblDutyHeader);
-            Controls.Add(lblTeacherHeader);
-            Controls.Add(dataGridViewTeacher);
             lblOccupancy.BringToFront();
             lblDutyHeader.BringToFront();
-            lblTeacherHeader.BringToFront();
-            dataGridViewTeacher.BringToFront();
 
             Shown += Form1_Shown;
         }
@@ -206,6 +179,9 @@ namespace LabManager
 
         private void Form1_Shown(object sender, EventArgs e)
         {
+            if (embedMode)
+                return;
+
             if (tvLeftPanel != null)
                 return;
 
@@ -302,49 +278,22 @@ namespace LabManager
                 ORDER BY pi.student_id";
             Connector.TableReader(attendanceQuery, dataSql);
 
-            DataTable teacherSql = new DataTable();
-            string teacherQuery = $@"
-                SELECT
-                    pi.student_id,
-                    pi.name,
-                    COALESCE(MIN(DATE_FORMAT(tl.time_stamp, '%H:%i')), '-') AS first_touch,
-                    COALESCE(MAX(DATE_FORMAT(tl.time_stamp, '%H:%i')), '-') AS last_touch,
-                    COUNT(tl.chip_id) AS touch_count
-                FROM personal_info pi
-                LEFT JOIN chip_list cl ON pi.student_id = cl.student_id
-                LEFT JOIN touch_log tl ON cl.chip_id = tl.chip_id AND tl.time_stamp LIKE '{today}%'
-                WHERE pi.student_id = '{PersonalInfoHelper.TeacherStudentId}'
-                GROUP BY pi.student_id, pi.name";
-            Connector.TableReader(teacherQuery, teacherSql);
+            int presentCount = ApplyAttendanceState(dataSql, OnSeat, OffSeat);
+            int todayCount = CountTodayVisitors(dataSql);
+            KeepTodayVisitors(dataSql);
 
             int rowHeight = CalcAttendanceRowHeight(dataSql.Rows.Count);
             dataGridView1.RowTemplate.Height = rowHeight;
-            if (dataGridViewTeacher != null)
-            {
-                dataGridViewTeacher.RowTemplate.Height = rowHeight;
-                dataGridViewTeacher.Height = rowHeight + 2;
-            }
 
-            int presentCount = ApplyAttendanceState(dataSql, OnSeat, OffSeat);
-            int todayCount = CountTodayVisitors(dataSql);
-            int teacherPresent = ApplyAttendanceState(teacherSql, OnSeat, OffSeat);
-            int teacherToday = CountTodayVisitors(teacherSql);
-            presentCount += teacherPresent;
-            todayCount += teacherToday;
-
-            dataSql.Columns.Remove("touch_count");
-            if (teacherSql.Columns.Contains("touch_count"))
-                teacherSql.Columns.Remove("touch_count");
+            if (dataSql.Columns.Contains("touch_count"))
+                dataSql.Columns.Remove("touch_count");
 
             UpdateOccupancySummary(presentCount, todayCount);
 
             dataGridView1.DataSource = dataSql;
-            BindAttendanceColumns(dataGridView1, showHeaders: true, teacherGrid: false);
-            dataGridViewTeacher.DataSource = teacherSql;
-            BindAttendanceColumns(dataGridViewTeacher, showHeaders: false, teacherGrid: true);
+            BindAttendanceColumns(dataGridView1, showHeaders: true);
 
             ApplyAttendanceGridColors(dataGridView1);
-            ApplyAttendanceGridColors(dataGridViewTeacher);
 
             bool isDutyDay = LabCalendarStore.IsDutyDay(dt.Date);
             if (isDutyDay)
@@ -422,6 +371,15 @@ namespace LabManager
             return count;
         }
 
+        private static void KeepTodayVisitors(DataTable table)
+        {
+            for (int i = table.Rows.Count - 1; i >= 0; i--)
+            {
+                if (Convert.ToInt32(table.Rows[i]["touch_count"]) <= 0)
+                    table.Rows.RemoveAt(i);
+            }
+        }
+
         private int CalcAttendanceRowHeight(int studentCount)
         {
             int attendanceAreaHeight = winHeight - btn1Size - ColumnHeadHeight - ClockMargin
@@ -431,7 +389,7 @@ namespace LabManager
             return Math.Max(40, attendanceAreaHeight / studentCount);
         }
 
-        private void BindAttendanceColumns(DataGridView grid, bool showHeaders, bool teacherGrid)
+        private void BindAttendanceColumns(DataGridView grid, bool showHeaders)
         {
             if (grid.Columns.Count < 5)
                 return;
@@ -465,17 +423,9 @@ namespace LabManager
 
             grid.Columns[1].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
-            if (teacherGrid)
-            {
-                grid.Columns[0].Visible = false;
-                grid.Columns[1].Width = winWidth - fixedWithoutId;
-            }
-            else
-            {
-                grid.Columns[0].Visible = true;
-                grid.Columns[0].Width = idWidth;
-                grid.Columns[1].Width = winWidth - fixedWithId;
-            }
+            grid.Columns[0].Visible = true;
+            grid.Columns[0].Width = idWidth;
+            grid.Columns[1].Width = winWidth - fixedWithId;
 
             grid.Columns[2].Width = touchWidth;
             grid.Columns[3].Width = touchWidth;
@@ -645,6 +595,16 @@ namespace LabManager
 
         private void button3_Click(object sender, EventArgs e)
         {
+            if (embedMode)
+            {
+                Form host = TopLevelControl as Form;
+                if (host != null && host != this)
+                {
+                    host.Close();
+                    return;
+                }
+            }
+
             Application.Exit();
         }
 

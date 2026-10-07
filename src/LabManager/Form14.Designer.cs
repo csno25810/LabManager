@@ -8,7 +8,13 @@ namespace LabManager
         private System.Windows.Forms.TableLayoutPanel tableWeekdays;
         private System.Windows.Forms.TableLayoutPanel tableCalendar;
         private System.Windows.Forms.Label lblTodayHeader;
+        private System.Windows.Forms.TableLayoutPanel tableToday;
+        private System.Windows.Forms.Label lblScheduleTitle;
+        private System.Windows.Forms.Label lblQrTitle;
+        private System.Windows.Forms.Panel panelQr;
         private System.Windows.Forms.ListView listViewToday;
+        private System.Windows.Forms.PictureBox picPortalQr;
+        private System.Windows.Forms.Label lblPortalQr;
         private System.Windows.Forms.Timer timerRefresh;
 
         protected override void Dispose(bool disposing)
@@ -25,7 +31,13 @@ namespace LabManager
             this.tableWeekdays = new System.Windows.Forms.TableLayoutPanel();
             this.tableCalendar = new System.Windows.Forms.TableLayoutPanel();
             this.lblTodayHeader = new System.Windows.Forms.Label();
+            this.tableToday = new System.Windows.Forms.TableLayoutPanel();
+            this.lblScheduleTitle = new System.Windows.Forms.Label();
+            this.lblQrTitle = new System.Windows.Forms.Label();
+            this.panelQr = new System.Windows.Forms.Panel();
             this.listViewToday = new System.Windows.Forms.ListView();
+            this.picPortalQr = new System.Windows.Forms.PictureBox();
+            this.lblPortalQr = new System.Windows.Forms.Label();
             this.timerRefresh = new System.Windows.Forms.Timer(this.components);
             this.SuspendLayout();
 
@@ -49,9 +61,9 @@ namespace LabManager
 
             this.listViewToday.View = System.Windows.Forms.View.Details;
             this.listViewToday.FullRowSelect = true;
-            this.listViewToday.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.Nonclickable;
-            this.listViewToday.Columns.Add("時刻", 80);
-            this.listViewToday.Columns.Add("予定", 300);
+            this.listViewToday.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
+            this.listViewToday.Columns.Add("項目", 80);
+            this.listViewToday.Columns.Add("内容", 300);
 
             this.timerRefresh.Tick += new System.EventHandler(this.timerRefresh_Tick);
 

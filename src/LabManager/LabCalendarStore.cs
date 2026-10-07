@@ -34,7 +34,6 @@ namespace LabManager
         private static readonly Color TodayBackground = Color.FromArgb(240, 240, 240);
 
         private static bool schemaReady;
-        private static bool schemaAttempted;
 
         private const string CreateTableSql =
             @"CREATE TABLE IF NOT EXISTS lab_calendar_day (
@@ -60,13 +59,6 @@ namespace LabManager
             if (schemaReady)
                 return true;
 
-            if (schemaAttempted && !schemaReady)
-            {
-                errorMessage = "カレンダー用テーブルの準備に失敗しています。";
-                return false;
-            }
-
-            schemaAttempted = true;
             if (!Connector.IsConnected)
             {
                 errorMessage = "データベースに接続されていません。";

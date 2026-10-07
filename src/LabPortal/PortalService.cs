@@ -246,7 +246,7 @@ namespace LabPortal
             List<AttendanceRow> rows = LoadAttendance(out present, out visitors);
             return HttpResponse.Html(AttendancePage(
                 session, rows, present, visitors,
-                LanAccess.IsSameLan(request.ClientAddress),
+                LanAccess.CanCheckIn(request.ClientAddress),
                 request.QueryValue("checkin"),
                 request.QueryValue("msg")));
         }
@@ -258,8 +258,8 @@ namespace LabPortal
                 return HttpResponse.Redirect("/login");
             if (request.Method != "POST")
                 return HttpResponse.Redirect("/attendance");
-            if (!LanAccess.IsSameLan(request.ClientAddress))
-                return HttpResponse.Redirect("/attendance?checkin=ng&msg=" + Uri.EscapeDataString("同一Wi-Fiのときだけ入室できます。"));
+            if (!LanAccess.CanCheckIn(request.ClientAddress))
+                return HttpResponse.Redirect("/attendance?checkin=ng&msg=" + Uri.EscapeDataString("学内ネット（Wi-Fiまたは有線）からだけ入室できます。"));
 
             string error;
             if (!TryRecordPortalTouch(session.StudentId, out error))
@@ -487,9 +487,7 @@ namespace LabPortal
             using (var conn = Open())
             {
                 AddAttendanceGroup(conn, today, "pi.student_id <> @teacher AND pi.student_id NOT LIKE 'T%'",
-                    rows, ref presentCount, ref visitorCount, teachers: false);
-                AddAttendanceGroup(conn, today, "pi.student_id = @teacher",
-                    rows, ref presentCount, ref visitorCount, teachers: true);
+                    rows, ref presentCount, ref visitorCount);
             }
 
             return rows;
@@ -501,8 +499,7 @@ namespace LabPortal
             string where,
             List<AttendanceRow> rows,
             ref int presentCount,
-            ref int visitorCount,
-            bool teachers)
+            ref int visitorCount)
         {
             string sql = @"
                 SELECT
@@ -527,11 +524,13 @@ namespace LabPortal
                     while (reader.Read())
                     {
                         int touchCount = Convert.ToInt32(reader["touch_count"]);
+                        if (touchCount <= 0)
+                            continue;
+
                         bool present = touchCount % 2 == 1;
                         if (present)
                             presentCount++;
-                        if (touchCount > 0)
-                            visitorCount++;
+                        visitorCount++;
 
                         rows.Add(new AttendanceRow
                         {
@@ -541,7 +540,7 @@ namespace LabPortal
                             LastTouch = Convert.ToString(reader["last_touch"]),
                             State = present ? "在席" : "不在",
                             Present = present,
-                            Teacher = teachers
+                            Teacher = false
                         });
                     }
                 }
@@ -777,23 +776,30 @@ namespace LabPortal
         {
             var sb = new StringBuilder();
             sb.Append(Nav(session, "attendance"));
-            sb.Append(CheckinBox(session, rows, sameLan, checkin, message));
             sb.Append("<p class=\"kpi\">在室 ").Append(present).Append(" 人　|　本日来室 ").Append(visitors).Append(" 人</p>");
             sb.Append("<p class=\"muted\">判定はテレビ右画面と同じです（当日タッチ奇数=在席）。30秒ごとに更新します。</p>");
             sb.Append("<table><thead><tr><th>学籍番号</th><th>氏名</th><th>初回</th><th>最終</th><th>状態</th></tr></thead><tbody>");
-            foreach (AttendanceRow row in rows)
+            if (rows.Count == 0)
             {
-                string css = row.Present ? "present" : "absent";
-                string id = row.Teacher ? "" : HttpUtility.HtmlEncode(row.StudentId);
-                sb.Append("<tr class=\"").Append(css).Append("\">")
-                    .Append("<td>").Append(id).Append("</td>")
-                    .Append("<td>").Append(HttpUtility.HtmlEncode(row.Name)).Append("</td>")
-                    .Append("<td>").Append(HttpUtility.HtmlEncode(row.FirstTouch)).Append("</td>")
-                    .Append("<td>").Append(HttpUtility.HtmlEncode(row.LastTouch)).Append("</td>")
-                    .Append("<td>").Append(HttpUtility.HtmlEncode(row.State)).Append("</td>")
-                    .Append("</tr>");
+                sb.Append("<tr><td colspan=\"5\" class=\"muted\">本日の来室はまだありません。</td></tr>");
+            }
+            else
+            {
+                foreach (AttendanceRow row in rows)
+                {
+                    string css = row.Present ? "present" : "absent";
+                    string id = HttpUtility.HtmlEncode(row.StudentId);
+                    sb.Append("<tr class=\"").Append(css).Append("\">")
+                        .Append("<td>").Append(id).Append("</td>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(row.Name)).Append("</td>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(row.FirstTouch)).Append("</td>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(row.LastTouch)).Append("</td>")
+                        .Append("<td>").Append(HttpUtility.HtmlEncode(row.State)).Append("</td>")
+                        .Append("</tr>");
+                }
             }
             sb.Append("</tbody></table>");
+            sb.Append(CheckinBox(session, rows, sameLan, checkin, message));
 
             string html = Wrap("在席状況", sb.ToString());
             return html.Replace("</head>", "<meta http-equiv=\"refresh\" content=\"30\"></head>");
@@ -903,12 +909,12 @@ namespace LabPortal
                 sb.Append("<form method=\"post\" action=\"/checkin\">")
                     .Append("<button type=\"submit\">").Append(label).Append("</button>")
                     .Append("</form>");
-                sb.Append("<p class=\"hint\">同一Wi-Fiからの操作です。カードを持っていなくても記録できます。</p>");
+                sb.Append("<p class=\"hint\">学内ネット（Wi-Fi / 有線）からの操作です。カードがなくても記録できます。</p>");
             }
             else
             {
                 sb.Append("<p><button type=\"button\" disabled>").Append(label).Append("</button></p>");
-                sb.Append("<p class=\"error\">同一Wi-Fiのときだけ押せます。研究室（またはこのPC）のネットワークに接続してください。</p>");
+                sb.Append("<p class=\"error\">携帯回線など学外からは押せません。研究室の Wi-Fi か有線に接続してください。</p>");
             }
 
             sb.Append("</section>");
@@ -996,7 +1002,7 @@ namespace LabPortal
                    "button:disabled{background:#bbb;color:#666;}" +
                    "a.google{display:block;text-align:center;padding:12px;border:1px solid #111;background:#fff;text-decoration:none;font-weight:bold;}" +
                    ".or{text-align:center;margin:16px 0 8px;}" +
-                   "section.checkin{background:#fff;border:1px solid #111;padding:12px;margin:0 0 16px;}" +
+                   "section.checkin{background:#fff;border:1px solid #111;padding:12px;margin:16px 0 0;}" +
                    "section.checkin form{border:0;padding:0;background:transparent;}" +
                    ".error{color:#a40000;font-weight:bold;}" +
                    ".ok{color:#0a5a0a;font-weight:bold;}" +

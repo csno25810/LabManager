@@ -28,7 +28,6 @@ namespace LabManager
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8";
 
         private static bool schemaReady;
-        private static bool schemaAttempted;
 
         public static bool EnsureSchema(out string errorMessage)
         {
@@ -36,13 +35,6 @@ namespace LabManager
             if (schemaReady)
                 return true;
 
-            if (schemaAttempted && !schemaReady)
-            {
-                errorMessage = "曜日担当テーブルの準備に失敗しています。";
-                return false;
-            }
-
-            schemaAttempted = true;
             if (!Connector.IsConnected)
             {
                 errorMessage = "データベースに接続されていません。";

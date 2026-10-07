@@ -11,8 +11,7 @@ namespace LabManager
     static class Program
     {
         /// <summary>
-        /// 研究室テレビPC用。Screen.bat から /tv で起動すると
-        /// メイン画面（右半分）とテレビ左画面（左半分）を同時表示する。
+        /// 研究室テレビPC用。起動すると左右を1ウィンドウ（Form16）で表示する。
         /// </summary>
         public static bool TvMode { get; private set; }
 
@@ -31,7 +30,7 @@ namespace LabManager
 
             // DB 接続は Form1 の GetConnection() に一任する。
             // 接続に失敗してもアプリは起動し、未接続モードとして UI を触れるようにする。
-            Application.Run(new Form1());
+            Application.Run(new Form16());
         }
     }
     public class Setting
