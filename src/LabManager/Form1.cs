@@ -37,6 +37,7 @@ namespace LabManager
         string OnSeat = "在席";
         private System.Timers.Timer dailyTimer;
         private DateTime? lastPenaltyRunDate;
+        private bool reloadingAttendance;
         /// <summary>テレビ左半分の表示専用カレンダー (TvCalendarPanel / Form14)</summary>
         private Form14 tvLeftPanel;
         private readonly bool embedMode;
@@ -162,6 +163,10 @@ namespace LabManager
             timer3.Start();
             GetConnection();
 
+            LiveViewRefresh.AttendanceChanged += LiveViewRefresh_AttendanceChanged;
+            FormClosed += (sender, args) =>
+                LiveViewRefresh.AttendanceChanged -= LiveViewRefresh_AttendanceChanged;
+
             ReadAllStatments();
 
             Controls.Add(lblOccupancy);
@@ -258,7 +263,25 @@ namespace LabManager
                 return;
             }
 
+            if (reloadingAttendance)
+                return;
+
+            reloadingAttendance = true;
             timer1.Enabled = false;
+            try
+            {
+                ReloadAttendanceGrids();
+            }
+            finally
+            {
+                reloadingAttendance = false;
+                if (Connector.IsConnected)
+                    timer1.Enabled = true;
+            }
+        }
+
+        private void ReloadAttendanceGrids()
+        {
             DataTable dataSql = new DataTable();
             DateTime dt = DateTime.Now;
             string today = dt.ToString("yyyy-MM-dd");
@@ -290,6 +313,7 @@ namespace LabManager
 
             UpdateOccupancySummary(presentCount, todayCount);
 
+            dataGridView1.DataSource = null;
             dataGridView1.DataSource = dataSql;
             BindAttendanceColumns(dataGridView1, showHeaders: true);
 
@@ -332,8 +356,6 @@ namespace LabManager
                 dataGridView2.DataSource = null;
                 UpdateDutyHeader(null, false);
             }
-
-            timer1.Enabled = true;
         }
 
         private static int ApplyAttendanceState(DataTable table, string onSeat, string offSeat)
@@ -464,6 +486,7 @@ namespace LabManager
 
         private void SetupDataGridView2(DataTable data)
         {
+            dataGridView2.DataSource = null;
             dataGridView2.DataSource = data;
             dataGridView2.AutoGenerateColumns = true;
 
@@ -505,7 +528,17 @@ namespace LabManager
 
         private void AttendanceGrid_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
         {
-            ApplyAttendanceGridColors((DataGridView)sender);
+            var grid = (DataGridView)sender;
+            ApplyAttendanceGridColors(grid);
+            if (!grid.IsHandleCreated)
+                return;
+
+            // バインド中に ClearSelection すると再入例外になり、以降の自動更新が止まる
+            grid.BeginInvoke(new Action(() =>
+            {
+                if (!grid.IsDisposed)
+                    grid.ClearSelection();
+            }));
         }
 
         private void CellColorChange()
@@ -517,9 +550,6 @@ namespace LabManager
         {
             if (grid == null || grid.RowCount == 0)
                 return;
-
-            grid.ClearSelection();
-            grid.CurrentCell = null;
 
             DataGridViewColumn stateColumn = grid.Columns["State"];
             if (stateColumn == null)
@@ -621,8 +651,16 @@ namespace LabManager
 
         private void button4_Click(object sender, EventArgs e)
         {
-            Form4 menuForm = new Form4(mySqlSet);
-            menuForm.ShowDialog();
+            using (Form4 menuForm = new Form4(mySqlSet))
+                menuForm.ShowDialog(this);
+            ReadAllStatments();
+        }
+
+        private void LiveViewRefresh_AttendanceChanged(object sender, EventArgs e)
+        {
+            if (IsDisposed)
+                return;
+            ReadAllStatments();
         }
 
         //SQLクエリを作成データ取得
@@ -834,5 +872,18 @@ namespace LabManager
 
     }
 
+    /// <summary>
+    /// タッチ履歴や出席を変えたあと、開いている在席画面へ再読込を知らせる。
+    /// </summary>
+    public static class LiveViewRefresh
+    {
+        public static event EventHandler AttendanceChanged;
 
+        public static void NotifyAttendance()
+        {
+            EventHandler handler = AttendanceChanged;
+            if (handler != null)
+                handler(null, EventArgs.Empty);
+        }
+    }
 }

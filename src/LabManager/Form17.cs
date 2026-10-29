@@ -731,6 +731,7 @@ namespace LabManager
             TouchAuditLog.Record("INSERT", newId, studentId, chipId, null, time.Value, ManualTerminalId);
             SyncDutyStatus(studentId);
             ReloadView();
+            LiveViewRefresh.NotifyAttendance();
             if (announce)
                 AnnouncePresence(name);
         }
@@ -771,6 +772,7 @@ namespace LabManager
             TouchAuditLog.Record("UPDATE", row.Id, studentId, row.ChipId, row.Time, time.Value, row.TerminalId);
             SyncDutyStatus(studentId);
             ReloadView();
+            LiveViewRefresh.NotifyAttendance();
         }
 
         private void buttonDelete_Click(object sender, EventArgs e)
@@ -810,6 +812,7 @@ namespace LabManager
             TouchAuditLog.Record("DELETE", row.Id, studentId, row.ChipId, row.Time, null, row.TerminalId);
             SyncDutyStatus(studentId);
             ReloadView();
+            LiveViewRefresh.NotifyAttendance();
         }
 
         private DateTime? ConfirmTouchTime(int? replacingId, DateTime chosen)

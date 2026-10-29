@@ -54,6 +54,7 @@ namespace LabManager
         private void btnRefresh_Click(object sender, EventArgs e)
         {
             ReloadAll();
+            LiveViewRefresh.NotifyAttendance();
         }
 
         private void btnClose_Click(object sender, EventArgs e)
@@ -188,6 +189,7 @@ namespace LabManager
             if (students.Columns.Contains("touch_count"))
                 students.Columns.Remove("touch_count");
 
+            gridAttendance.DataSource = null;
             gridAttendance.DataSource = students;
             BindAttendanceColumns();
             ApplyAttendanceColors();
@@ -358,6 +360,7 @@ namespace LabManager
             groupDuty.Text = table.Rows.Count == 0
                 ? "日直（担当なし）"
                 : "日直（" + table.Rows.Count + "名）";
+            gridDuty.DataSource = null;
             gridDuty.DataSource = table;
             BindDutyColumns();
             return table.Rows.Count;
