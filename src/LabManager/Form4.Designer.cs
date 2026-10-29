@@ -279,7 +279,9 @@ namespace LabManager
             this.button13.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.button13.Size = new System.Drawing.Size(190, 39);
             this.button13.TabIndex = 17;
+            this.button13.Text = "18:個人カルテ";
             this.button13.UseVisualStyleBackColor = false;
+            this.button13.Click += new System.EventHandler(this.button13_Click);
             // 
             // button14
             // 

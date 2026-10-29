@@ -116,6 +116,18 @@ namespace LabManager
             }
         }
 
+        private void button13_Click(object sender, EventArgs e)
+        {
+            using (Form18 login = new Form18(mySqlSet))
+            {
+                if (login.ShowDialog(this) != DialogResult.OK || login.Session == null)
+                    return;
+
+                using (Form19 carte = new Form19(mySqlSet, login.Session))
+                    carte.ShowDialog(this);
+            }
+        }
+
         private void label1_Click(object sender, EventArgs e)
         {
 

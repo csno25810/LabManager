@@ -19,6 +19,8 @@ LabManager の開発用 MySQL スキーマ定義とサンプルデータ。
 | `migrate_009_add_duty_weekday_roster.sql` | 曜日別日直担当 `duty_weekday_roster` テーブルを追加 |
 | `migrate_010_add_lab_user.sql` | マルチデバイスログイン `lab_user` テーブルを追加（LabPortal） |
 | `migrate_011_add_touch_edit_log.sql` | タッチ履歴の手動編集ログ `touch_edit_log` を追加（Form17） |
+| `migrate_012_add_student_carte.sql` | 個人カルテ用 `progress_log` と `references_list.student_id` |
+| `seed_carte_demo.sql` | 個人カルテ用の進捗・文献の仮データ |
 | `fix_personal_info_names.sql` | 氏名が `????` 化した personal_info を修復 |
 
 ## 適用方法（ローカルMySQLに対して）
@@ -49,7 +51,9 @@ mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_008_add_lab
 mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_009_add_duty_weekday_roster.sql
 mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_010_add_lab_user.sql
 mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_011_add_touch_edit_log.sql
+mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_012_add_student_carte.sql
 mysql -u root -p --default-character-set=utf8mb4 felica < db\seed.sql
+mysql -u root -p --default-character-set=utf8mb4 felica < db\seed_carte_demo.sql
 ```
 
 **注意:** `seed.sql` は `lab_calendar_day` / `duty_weekday_roster` / `duty_schedule` を削除しません。カレンダー・日直を初期化したいときだけ `seed_demo_reset.sql` を使ってください。
@@ -208,7 +212,21 @@ Form17 での追加・時刻変更・削除を記録する（migrate_011）。�
 | password_hash | VARCHAR | PBKDF2 ハッシュ（平文は保存しない） |
 | role | VARCHAR | `student` / `teacher` / `admin`（権限の細分化は今後） |
 
-LabPortal 初回起動時、`personal_info` から行を作成する（初期パスワード `lab2026`）。既存行は消さない。テレビ用 LabManager はこの表を使わない。
+LabPortal の初回起動時、または LabManager の個人カルテログイン時に、`personal_info` から足りない行を作る（初期パスワード `lab2026`）。既存行は消さない。テレビの在席画面自体はログインしない。個人カルテは MENU「18:個人カルテ」から、同じ `lab_user` で入る。
+
+#### progress_log（研究進捗）— 個人カルテ
+
+日誌（`diary_log`）とは別。その学生の研究の途中経過。
+
+| 列 | 型 | 意味 |
+|----|-----|------|
+| id | INT | 連番 |
+| student_id | VARCHAR | 学籍番号 |
+| progress_date | DATE | 記録日 |
+| title | VARCHAR | タイトル |
+| content | TEXT | 途中経過の本文 |
+
+開発用の仮データは `seed_carte_demo.sql`。カルテ画面を開いたとき、seed 学生に行が無ければ同じ内容を入れる。
 
 #### diary_log（日誌）— 先輩機能
 
@@ -219,12 +237,15 @@ LabPortal 初回起動時、`personal_info` から行を作成する（初期パ
 | title | VARCHAR | タイトル |
 | content | TEXT | 本文 |
 
-#### references_list（文献）— 先輩機能
+#### references_list（文献）— 先輩機能 / 個人カルテ
 
 | 列 | 型 | 意味 |
 |----|-----|------|
 | id | INT | 文献 ID |
+| student_id | VARCHAR | 個人カルテ用。空なら Form8 の全体登録 |
 | title, author, year, notes, url, … | 各種 | 文献メタデータ（Form8 で CRUD） |
+
+個人カルテはその学籍番号の行だけ出す。Form8 の登録画面は従来どおり（`student_id` は空のまま）。
 
 ---
 

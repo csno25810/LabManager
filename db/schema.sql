@@ -86,10 +86,23 @@ CREATE TABLE IF NOT EXISTS diary_log (
     KEY idx_diary_date (dialy_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 研究進捗（個人カルテ）。日誌 diary_log とは別。
+CREATE TABLE IF NOT EXISTS progress_log (
+    id            INT          NOT NULL AUTO_INCREMENT,
+    student_id    VARCHAR(20)  NOT NULL,
+    progress_date DATE         NOT NULL,
+    title         VARCHAR(255) NOT NULL,
+    content       TEXT         NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_progress_student (student_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 文献管理（Form8 が使用）
 -- 研究室DB (MySQL 5.1) の DESCRIBE 結果に合わせる。
+-- student_id は個人カルテ用。空なら研究室全体の登録（Form8）のまま。
 CREATE TABLE IF NOT EXISTS references_list (
     id             INT          NOT NULL AUTO_INCREMENT,
+    student_id     VARCHAR(20)  NOT NULL DEFAULT '',
     title          VARCHAR(255) NOT NULL,
     author         VARCHAR(255) NOT NULL,
     thesis_type    VARCHAR(255) NULL,
