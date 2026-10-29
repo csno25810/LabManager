@@ -25,7 +25,7 @@ namespace LabManager
         int SummaryBarHeight = 40;
         int DutyHeaderHeight = 28;
         int studentGridHeight;
-        static readonly TimeSpan DutyDeadline = new TimeSpan(8, 50, 0);
+        static readonly TimeSpan DutyDeadline = AttendanceRules.DutyDeadline;
 
         private Label lblOccupancy;
         private Label lblDutyHeader;
@@ -345,7 +345,7 @@ namespace LabManager
             for (int i = 0; i < table.Rows.Count; i++)
             {
                 int touchCount = Convert.ToInt32(table.Rows[i]["touch_count"]);
-                if (touchCount % 2 == 1)
+                if (AttendanceRules.IsPresent(touchCount))
                 {
                     table.Rows[i]["State"] = onSeat;
                     presentCount++;
@@ -659,28 +659,18 @@ namespace LabManager
         //日直の出席状況
         private void CheckAndUpdateDutyStatus(DataTable results)
         {
-            DateTime dutyTime = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 8, 50, 0);
             string today = DateTime.Now.ToString("yyyy-MM-dd");
 
             foreach (DataRow row in results.Rows)
             {
                 string studentId = row["student_id"].ToString();
 
-                DateTime? actualTime = row.IsNull("actual_time_stamp") ? (DateTime?)null : DateTime.Parse(row["actual_time_stamp"].ToString());
-                if (actualTime == null)
-                {
-                    continue;  // 出勤時刻が記録されていない場合はスキップ
-                }
+                if (row.IsNull("actual_time_stamp"))
+                    continue;
 
-                TimeSpan delay = actualTime.Value - dutyTime;
-                int newStatus = 1; // Default to '出席' (1)
-                if (delay > TimeSpan.FromMinutes(10))
-                {
-                    newStatus = 2; // '遅刻' (2)
-                }
+                DateTime actualTime = DateTime.Parse(row["actual_time_stamp"].ToString());
+                int newStatus = AttendanceRules.DutyStatusFromFirstTouch(actualTime);
                 UpdateDutyStatus(studentId, today, newStatus);
-
-
             }
         }
 
@@ -689,7 +679,7 @@ namespace LabManager
         // 罰直(1): 上記に加え、10分以内は -2、未タッチ+4
         private void UpdatePenaltyCount(DataTable results)
         {
-            DateTime dutyTime = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 8, 50, 0);
+            DateTime dutyTime = DateTime.Today + AttendanceRules.DutyDeadline;
 
             foreach (DataRow row in results.Rows)
             {
@@ -713,7 +703,7 @@ namespace LabManager
                         {
                             penaltyIncrement = 2;
                         }
-                        else if (delay > TimeSpan.FromMinutes(10))
+                        else if (delay > AttendanceRules.OnTimeGrace)
                         {
                             penaltyIncrement = 1;
                         }
@@ -738,7 +728,7 @@ namespace LabManager
                         {
                             penaltyIncrement = 2;
                         }
-                        else if (delay > TimeSpan.FromMinutes(10))
+                        else if (delay > AttendanceRules.OnTimeGrace)
                         {
                             penaltyIncrement = 1;
                         }
