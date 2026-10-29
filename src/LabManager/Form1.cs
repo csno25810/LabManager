@@ -25,7 +25,7 @@ namespace LabManager
         int SummaryBarHeight = 40;
         int DutyHeaderHeight = 28;
         int studentGridHeight;
-        static readonly TimeSpan DutyDeadline = new TimeSpan(8, 50, 0);
+        static readonly TimeSpan DutyDeadline = AttendanceRules.DutyDeadline;
 
         private Label lblOccupancy;
         private Label lblDutyHeader;
@@ -37,6 +37,7 @@ namespace LabManager
         string OnSeat = "在席";
         private System.Timers.Timer dailyTimer;
         private DateTime? lastPenaltyRunDate;
+        private bool reloadingAttendance;
         /// <summary>テレビ左半分の表示専用カレンダー (TvCalendarPanel / Form14)</summary>
         private Form14 tvLeftPanel;
         private readonly bool embedMode;
@@ -162,6 +163,10 @@ namespace LabManager
             timer3.Start();
             GetConnection();
 
+            LiveViewRefresh.AttendanceChanged += LiveViewRefresh_AttendanceChanged;
+            FormClosed += (sender, args) =>
+                LiveViewRefresh.AttendanceChanged -= LiveViewRefresh_AttendanceChanged;
+
             ReadAllStatments();
 
             Controls.Add(lblOccupancy);
@@ -258,7 +263,25 @@ namespace LabManager
                 return;
             }
 
+            if (reloadingAttendance)
+                return;
+
+            reloadingAttendance = true;
             timer1.Enabled = false;
+            try
+            {
+                ReloadAttendanceGrids();
+            }
+            finally
+            {
+                reloadingAttendance = false;
+                if (Connector.IsConnected)
+                    timer1.Enabled = true;
+            }
+        }
+
+        private void ReloadAttendanceGrids()
+        {
             DataTable dataSql = new DataTable();
             DateTime dt = DateTime.Now;
             string today = dt.ToString("yyyy-MM-dd");
@@ -290,6 +313,7 @@ namespace LabManager
 
             UpdateOccupancySummary(presentCount, todayCount);
 
+            dataGridView1.DataSource = null;
             dataGridView1.DataSource = dataSql;
             BindAttendanceColumns(dataGridView1, showHeaders: true);
 
@@ -332,8 +356,6 @@ namespace LabManager
                 dataGridView2.DataSource = null;
                 UpdateDutyHeader(null, false);
             }
-
-            timer1.Enabled = true;
         }
 
         private static int ApplyAttendanceState(DataTable table, string onSeat, string offSeat)
@@ -345,7 +367,7 @@ namespace LabManager
             for (int i = 0; i < table.Rows.Count; i++)
             {
                 int touchCount = Convert.ToInt32(table.Rows[i]["touch_count"]);
-                if (touchCount % 2 == 1)
+                if (AttendanceRules.IsPresent(touchCount))
                 {
                     table.Rows[i]["State"] = onSeat;
                     presentCount++;
@@ -464,6 +486,7 @@ namespace LabManager
 
         private void SetupDataGridView2(DataTable data)
         {
+            dataGridView2.DataSource = null;
             dataGridView2.DataSource = data;
             dataGridView2.AutoGenerateColumns = true;
 
@@ -505,7 +528,17 @@ namespace LabManager
 
         private void AttendanceGrid_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
         {
-            ApplyAttendanceGridColors((DataGridView)sender);
+            var grid = (DataGridView)sender;
+            ApplyAttendanceGridColors(grid);
+            if (!grid.IsHandleCreated)
+                return;
+
+            // バインド中に ClearSelection すると再入例外になり、以降の自動更新が止まる
+            grid.BeginInvoke(new Action(() =>
+            {
+                if (!grid.IsDisposed)
+                    grid.ClearSelection();
+            }));
         }
 
         private void CellColorChange()
@@ -517,9 +550,6 @@ namespace LabManager
         {
             if (grid == null || grid.RowCount == 0)
                 return;
-
-            grid.ClearSelection();
-            grid.CurrentCell = null;
 
             DataGridViewColumn stateColumn = grid.Columns["State"];
             if (stateColumn == null)
@@ -621,8 +651,16 @@ namespace LabManager
 
         private void button4_Click(object sender, EventArgs e)
         {
-            Form4 menuForm = new Form4(mySqlSet);
-            menuForm.ShowDialog();
+            using (Form4 menuForm = new Form4(mySqlSet))
+                menuForm.ShowDialog(this);
+            ReadAllStatments();
+        }
+
+        private void LiveViewRefresh_AttendanceChanged(object sender, EventArgs e)
+        {
+            if (IsDisposed)
+                return;
+            ReadAllStatments();
         }
 
         //SQLクエリを作成データ取得
@@ -659,28 +697,18 @@ namespace LabManager
         //日直の出席状況
         private void CheckAndUpdateDutyStatus(DataTable results)
         {
-            DateTime dutyTime = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 8, 50, 0);
             string today = DateTime.Now.ToString("yyyy-MM-dd");
 
             foreach (DataRow row in results.Rows)
             {
                 string studentId = row["student_id"].ToString();
 
-                DateTime? actualTime = row.IsNull("actual_time_stamp") ? (DateTime?)null : DateTime.Parse(row["actual_time_stamp"].ToString());
-                if (actualTime == null)
-                {
-                    continue;  // 出勤時刻が記録されていない場合はスキップ
-                }
+                if (row.IsNull("actual_time_stamp"))
+                    continue;
 
-                TimeSpan delay = actualTime.Value - dutyTime;
-                int newStatus = 1; // Default to '出席' (1)
-                if (delay > TimeSpan.FromMinutes(10))
-                {
-                    newStatus = 2; // '遅刻' (2)
-                }
+                DateTime actualTime = DateTime.Parse(row["actual_time_stamp"].ToString());
+                int newStatus = AttendanceRules.DutyStatusFromFirstTouch(actualTime);
                 UpdateDutyStatus(studentId, today, newStatus);
-
-
             }
         }
 
@@ -689,7 +717,7 @@ namespace LabManager
         // 罰直(1): 上記に加え、10分以内は -2、未タッチ+4
         private void UpdatePenaltyCount(DataTable results)
         {
-            DateTime dutyTime = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 8, 50, 0);
+            DateTime dutyTime = DateTime.Today + AttendanceRules.DutyDeadline;
 
             foreach (DataRow row in results.Rows)
             {
@@ -713,7 +741,7 @@ namespace LabManager
                         {
                             penaltyIncrement = 2;
                         }
-                        else if (delay > TimeSpan.FromMinutes(10))
+                        else if (delay > AttendanceRules.OnTimeGrace)
                         {
                             penaltyIncrement = 1;
                         }
@@ -738,7 +766,7 @@ namespace LabManager
                         {
                             penaltyIncrement = 2;
                         }
-                        else if (delay > TimeSpan.FromMinutes(10))
+                        else if (delay > AttendanceRules.OnTimeGrace)
                         {
                             penaltyIncrement = 1;
                         }
@@ -844,5 +872,18 @@ namespace LabManager
 
     }
 
+    /// <summary>
+    /// タッチ履歴や出席を変えたあと、開いている在席画面へ再読込を知らせる。
+    /// </summary>
+    public static class LiveViewRefresh
+    {
+        public static event EventHandler AttendanceChanged;
 
+        public static void NotifyAttendance()
+        {
+            EventHandler handler = AttendanceChanged;
+            if (handler != null)
+                handler(null, EventArgs.Empty);
+        }
+    }
 }

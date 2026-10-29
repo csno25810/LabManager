@@ -42,6 +42,22 @@ CREATE TABLE IF NOT EXISTS touch_log (
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- タッチ履歴の手動編集ログ（Form17。既存DBは migrate_011）
+CREATE TABLE IF NOT EXISTS touch_edit_log (
+    id              INT          NOT NULL AUTO_INCREMENT,
+    edited_at       DATETIME     NOT NULL,
+    action          VARCHAR(10)  NOT NULL,
+    touch_id        INT          NULL,
+    student_id      VARCHAR(20)  NOT NULL,
+    chip_id         VARCHAR(50)  NULL,
+    old_time_stamp  DATETIME     NULL,
+    new_time_stamp  DATETIME     NULL,
+    terminal_id     VARCHAR(10)  NULL,
+    PRIMARY KEY (id),
+    KEY idx_touch_edit_time (edited_at),
+    KEY idx_touch_edit_student (student_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 -- 日直スケジュール
 -- duty_status:   0=未出席 / 1=出席 / 2=遅刻
 -- duty_type:     '0'=通常日直 / '1'=罰直
@@ -70,10 +86,23 @@ CREATE TABLE IF NOT EXISTS diary_log (
     KEY idx_diary_date (dialy_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 研究進捗（個人カルテ）。日誌 diary_log とは別。
+CREATE TABLE IF NOT EXISTS progress_log (
+    id            INT          NOT NULL AUTO_INCREMENT,
+    student_id    VARCHAR(20)  NOT NULL,
+    progress_date DATE         NOT NULL,
+    title         VARCHAR(255) NOT NULL,
+    content       TEXT         NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_progress_student (student_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 文献管理（Form8 が使用）
 -- 研究室DB (MySQL 5.1) の DESCRIBE 結果に合わせる。
+-- student_id は個人カルテ用。空なら研究室全体の登録（Form8）のまま。
 CREATE TABLE IF NOT EXISTS references_list (
     id             INT          NOT NULL AUTO_INCREMENT,
+    student_id     VARCHAR(20)  NOT NULL DEFAULT '',
     title          VARCHAR(255) NOT NULL,
     author         VARCHAR(255) NOT NULL,
     thesis_type    VARCHAR(255) NULL,

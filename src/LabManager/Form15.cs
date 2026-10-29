@@ -14,7 +14,7 @@ namespace LabManager
     /// </summary>
     public partial class Form15 : Form
     {
-        private static readonly TimeSpan DutyDeadline = new TimeSpan(8, 50, 0);
+        private static readonly TimeSpan DutyDeadline = AttendanceRules.DutyDeadline;
         private static readonly CultureInfo Ja = CultureInfo.GetCultureInfo("ja-JP");
 
         private readonly Setting mySqlSet;
@@ -54,6 +54,7 @@ namespace LabManager
         private void btnRefresh_Click(object sender, EventArgs e)
         {
             ReloadAll();
+            LiveViewRefresh.NotifyAttendance();
         }
 
         private void btnClose_Click(object sender, EventArgs e)
@@ -78,6 +79,13 @@ namespace LabManager
         private void btnOpenDiary_Click(object sender, EventArgs e)
         {
             using (var form = new Form6(mySqlSet))
+                form.ShowDialog(this);
+            ReloadAll();
+        }
+
+        private void btnOpenTouch_Click(object sender, EventArgs e)
+        {
+            using (var form = new Form17(mySqlSet, datePicker.Value.Date, null))
                 form.ShowDialog(this);
             ReloadAll();
         }
@@ -181,6 +189,7 @@ namespace LabManager
             if (students.Columns.Contains("touch_count"))
                 students.Columns.Remove("touch_count");
 
+            gridAttendance.DataSource = null;
             gridAttendance.DataSource = students;
             BindAttendanceColumns();
             ApplyAttendanceColors();
@@ -226,7 +235,7 @@ namespace LabManager
                 int touchCount = Convert.ToInt32(row["touch_count"]);
                 if (isToday)
                 {
-                    if (touchCount % 2 == 1)
+                    if (AttendanceRules.IsPresent(touchCount))
                     {
                         row["State"] = onSeat;
                         presentCount++;
@@ -241,7 +250,7 @@ namespace LabManager
                     if (touchCount > 0)
                     {
                         row["State"] = onSeat;
-                        if (touchCount % 2 == 1)
+                        if (AttendanceRules.IsPresent(touchCount))
                             presentCount++;
                     }
                     else
@@ -351,6 +360,7 @@ namespace LabManager
             groupDuty.Text = table.Rows.Count == 0
                 ? "日直（担当なし）"
                 : "日直（" + table.Rows.Count + "名）";
+            gridDuty.DataSource = null;
             gridDuty.DataSource = table;
             BindDutyColumns();
             return table.Rows.Count;

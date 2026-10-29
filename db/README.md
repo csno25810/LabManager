@@ -18,6 +18,9 @@ LabManager の開発用 MySQL スキーマ定義とサンプルデータ。
 | `migrate_008_add_lab_calendar_day.sql` | 授業日・予定メモ `lab_calendar_day` テーブルを追加 |
 | `migrate_009_add_duty_weekday_roster.sql` | 曜日別日直担当 `duty_weekday_roster` テーブルを追加 |
 | `migrate_010_add_lab_user.sql` | マルチデバイスログイン `lab_user` テーブルを追加（LabPortal） |
+| `migrate_011_add_touch_edit_log.sql` | タッチ履歴の手動編集ログ `touch_edit_log` を追加（Form17） |
+| `migrate_012_add_student_carte.sql` | 個人カルテ用 `progress_log` と `references_list.student_id` |
+| `seed_carte_demo.sql` | 個人カルテ用の進捗・文献の仮データ |
 | `fix_personal_info_names.sql` | 氏名が `????` 化した personal_info を修復 |
 
 ## 適用方法（ローカルMySQLに対して）
@@ -47,7 +50,10 @@ mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_007_add_dut
 mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_008_add_lab_calendar_day.sql
 mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_009_add_duty_weekday_roster.sql
 mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_010_add_lab_user.sql
+mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_011_add_touch_edit_log.sql
+mysql -u root -p --default-character-set=utf8mb4 felica < db\migrate_012_add_student_carte.sql
 mysql -u root -p --default-character-set=utf8mb4 felica < db\seed.sql
+mysql -u root -p --default-character-set=utf8mb4 felica < db\seed_carte_demo.sql
 ```
 
 **注意:** `seed.sql` は `lab_calendar_day` / `duty_weekday_roster` / `duty_schedule` を削除しません。カレンダー・日直を初期化したいときだけ `seed_demo_reset.sql` を使ってください。
@@ -111,6 +117,10 @@ Get-Content $env:TEMP\lab_seed.sql -Raw -Encoding UTF8 | mysql --default-charact
 | 最終タッチ時刻 | 当日 MAX(time_stamp) |
 | 学生一覧 | `personal_info` 全員（学籍番号順）。タッチ未登録も表示 |
 | 先生行 | `student_id = '@'`（内部ID。画面では学籍番号非表示）。日直候補から除外 |
+
+在席フラグの列はない。直すときは **Form17 タッチ履歴編集**（MENU「17:タッチ履歴編集」、またはまとめページの「タッチ履歴」）で `touch_log` を追加・変更・削除する。テレビ右画面とまとめページは次の更新で同じ奇数/偶数判定になる。
+
+日直担当の場合、その日の最初のタッチで出席状況も揃える（8:50 から 10 分以内は出席、超過は遅刻、タッチが無くなれば未出席）。超過は 18:00 の罰直対象なので、在席表示の確認だけなら時刻を 8:50 にして記録する。カード未登録の学生には編集用カード `EDIT:学籍番号` を作る。操作は `touch_edit_log` に残る（`DebugPassword` があるときは出席状況編集と同じパスワード）。
 
 #### duty_schedule（日直スケジュール・出席状況）
 
@@ -177,6 +187,22 @@ Form5 で設定。授業日追加時に `duty_schedule` へ自動登録（土曜
 | old_duty_type | VARCHAR | 変更前の種類 |
 | new_duty_type | VARCHAR | 変更後の種類 |
 
+#### touch_edit_log（タッチ履歴編集ログ）
+
+Form17 での追加・時刻変更・削除を記録する（migrate_011）。画面を開いたときテーブルが無ければ作成する。
+
+| 列 | 型 | 意味 |
+|----|-----|------|
+| id | INT | 連番 |
+| edited_at | DATETIME | 編集日時 |
+| action | VARCHAR | INSERT / UPDATE / DELETE |
+| touch_id | INT | touch_log.id（NULL 可） |
+| student_id | VARCHAR | 対象学籍番号 |
+| chip_id | VARCHAR | カード ID |
+| old_time_stamp | DATETIME | 変更前時刻（NULL 可） |
+| new_time_stamp | DATETIME | 変更後時刻（NULL 可） |
+| terminal_id | VARCHAR | 端末 ID。手入力の追加は `EDIT` |
+
 #### lab_user（マルチデバイスログイン）— LabPortal
 
 | 列 | 型 | 意味 |
@@ -186,7 +212,21 @@ Form5 で設定。授業日追加時に `duty_schedule` へ自動登録（土曜
 | password_hash | VARCHAR | PBKDF2 ハッシュ（平文は保存しない） |
 | role | VARCHAR | `student` / `teacher` / `admin`（権限の細分化は今後） |
 
-LabPortal 初回起動時、`personal_info` から行を作成する（初期パスワード `lab2026`）。既存行は消さない。テレビ用 LabManager はこの表を使わない。
+LabPortal の初回起動時、または LabManager の個人カルテログイン時に、`personal_info` から足りない行を作る（初期パスワード `lab2026`）。既存行は消さない。テレビの在席画面自体はログインしない。個人カルテは MENU「18:個人カルテ」から、同じ `lab_user` で入る。
+
+#### progress_log（研究進捗）— 個人カルテ
+
+日誌（`diary_log`）とは別。その学生の研究の途中経過。
+
+| 列 | 型 | 意味 |
+|----|-----|------|
+| id | INT | 連番 |
+| student_id | VARCHAR | 学籍番号 |
+| progress_date | DATE | 記録日 |
+| title | VARCHAR | タイトル |
+| content | TEXT | 途中経過の本文 |
+
+開発用の仮データは `seed_carte_demo.sql`。カルテ画面を開いたとき、seed 学生に行が無ければ同じ内容を入れる。
 
 #### diary_log（日誌）— 先輩機能
 
@@ -197,12 +237,15 @@ LabPortal 初回起動時、`personal_info` から行を作成する（初期パ
 | title | VARCHAR | タイトル |
 | content | TEXT | 本文 |
 
-#### references_list（文献）— 先輩機能
+#### references_list（文献）— 先輩機能 / 個人カルテ
 
 | 列 | 型 | 意味 |
 |----|-----|------|
 | id | INT | 文献 ID |
+| student_id | VARCHAR | 個人カルテ用。空なら Form8 の全体登録 |
 | title, author, year, notes, url, … | 各種 | 文献メタデータ（Form8 で CRUD） |
+
+個人カルテはその学籍番号の行だけ出す。Form8 の登録画面は従来どおり（`student_id` は空のまま）。
 
 ---
 
@@ -226,9 +269,10 @@ personal_info ← chip_list ← touch_log
       ↑
 duty_schedule ← duty_weekday_roster（曜日マスタ）
       ↑
-duty_edit_log（編集履歴のみ参照）
+duty_edit_log（出席状況の編集履歴）
+touch_edit_log（タッチ履歴の編集履歴）
 
 lab_calendar_day（授業日・予定・授業回数算出）
 ```
 
-タッチ → chip_list で student_id を特定 → touch_log に記録 → メイン画面で在席判定・日直の出席時刻表示。日直担当は duty_schedule に登録され、duty_status が自動または出席状況編集で更新される。授業日でない日は日直を表示しない。
+タッチ → chip_list で student_id を特定 → touch_log に記録 → メイン画面で在席判定・日直の出席時刻表示。日直担当は duty_schedule に登録され、duty_status が自動または出席状況編集で更新される。授業日でない日は日直を表示しない。タッチそのものを直す場合は Form17。

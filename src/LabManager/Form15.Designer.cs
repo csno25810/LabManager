@@ -29,6 +29,7 @@ namespace LabManager
         private System.Windows.Forms.Button btnOpenDuty;
         private System.Windows.Forms.Button btnOpenCal;
         private System.Windows.Forms.Button btnOpenDiary;
+        private System.Windows.Forms.Button btnOpenTouch;
 
         protected override void Dispose(bool disposing)
         {
@@ -64,6 +65,7 @@ namespace LabManager
             this.btnOpenDuty = new System.Windows.Forms.Button();
             this.btnOpenCal = new System.Windows.Forms.Button();
             this.btnOpenDiary = new System.Windows.Forms.Button();
+            this.btnOpenTouch = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.gridAttendance)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.gridCalendar)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.gridDuty)).BeginInit();
@@ -253,6 +255,7 @@ namespace LabManager
             this.bottomPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.bottomPanel.Height = 48;
             this.bottomPanel.Padding = new System.Windows.Forms.Padding(8, 8, 8, 8);
+            this.bottomPanel.Controls.Add(this.btnOpenTouch);
             this.bottomPanel.Controls.Add(this.btnOpenDiary);
             this.bottomPanel.Controls.Add(this.btnOpenCal);
             this.bottomPanel.Controls.Add(this.btnOpenDuty);
@@ -277,6 +280,13 @@ namespace LabManager
             this.btnOpenDiary.Size = new System.Drawing.Size(140, 28);
             this.btnOpenDiary.Text = "日誌";
             this.btnOpenDiary.Click += new System.EventHandler(this.btnOpenDiary_Click);
+            //
+            // btnOpenTouch
+            //
+            this.btnOpenTouch.Location = new System.Drawing.Point(466, 10);
+            this.btnOpenTouch.Size = new System.Drawing.Size(140, 28);
+            this.btnOpenTouch.Text = "タッチ履歴";
+            this.btnOpenTouch.Click += new System.EventHandler(this.btnOpenTouch_Click);
             //
             // Form15
             //
