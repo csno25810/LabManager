@@ -135,6 +135,7 @@ namespace LabManager
             Controls.Add(lblTodayHeader);
             Controls.Add(tableToday);
             BuildWeekdayHeader();
+            btnRefresh.BringToFront();
             tvReady = true;
         }
 
@@ -175,6 +176,8 @@ namespace LabManager
             }
 
             LayoutQrPanel();
+            if (btnRefresh != null)
+                btnRefresh.BringToFront();
         }
 
         private void LayoutQrPanel()
@@ -197,6 +200,7 @@ namespace LabManager
         private void btnRefresh_Click(object sender, EventArgs e)
         {
             RefreshAll();
+            LiveViewRefresh.NotifyAttendance();
         }
 
         private void BuildWeekdayHeader()

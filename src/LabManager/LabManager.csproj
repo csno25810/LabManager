@@ -169,6 +169,17 @@
     <Compile Include="Form16.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Form17.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form18.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form19.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="StudentCarteStore.cs" />
+    <Compile Include="AttendanceRules.cs" />
     <Compile Include="LabCalendarStore.cs" />
     <Compile Include="DutyWeekdayRosterStore.cs" />
     <Compile Include="PersonalInfoHelper.cs" />

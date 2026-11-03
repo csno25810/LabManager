@@ -164,6 +164,7 @@ def collect_db_info(cnx, host, settings, ini_used):
         ("duty_schedule", "duty_schedule", None),
         ("diary_log", "diary_log", None),
         ("references_list", "references_list", None),
+        ("touch_edit_log", "touch_edit_log", None),
     ]
     table_set = set(tables)
     col_cache = {}
